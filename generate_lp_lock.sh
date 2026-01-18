@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# generate_paxi_lp_lock_final.sh - FOR PAXI NATIVE SWAP MODULE
-# Locks LP tokens created via Paxi's native AMM
+# generate_lp_lock.sh - CONSISTENT VERSION
+# Uses same naming convention as vesting: prc20-lp-lock
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -11,11 +11,8 @@ NC='\033[0m'
 
 clear
 echo -e "${BLUE}=========================================="
-echo "  PAXI LP LOCK CONTRACT - FINAL VERSION"
-echo "  For Paxi Native Swap Module"
-echo "  ✓ Locks LP tokens from Paxi AMM"
-echo "  ✓ Returns LP after unlock time"
-echo "  ✓ Security Hardened"
+echo "  LP LOCK CONTRACT GENERATOR"
+echo "  For Paxi Native Swap LP Tokens"
 echo "==========================================${NC}"
 
 if ! command -v cargo &> /dev/null; then
@@ -23,21 +20,17 @@ if ! command -v cargo &> /dev/null; then
     exit 1
 fi
 
-if ! rustc --print target-list | grep -q "wasm32-unknown-unknown"; then
-    echo -e "${RED}✗ wasm32-unknown-unknown target not found!${NC}"
-    exit 1
-fi
-
 echo -e "${GREEN}✓ Requirements OK${NC}"
 echo ""
 
-PROJECT_DIR="contracts/paxi-lp-lock-final"
+# CONSISTENT: Use same naming as vesting
+PROJECT_DIR="contracts/prc20-lp-lock"
 mkdir -p "$PROJECT_DIR/src"
 cd "$PROJECT_DIR"
 
 cat > Cargo.toml << 'EOF'
 [package]
-name = "paxi-lp-lock"
+name = "prc20-lp-lock"
 version = "1.0.0"
 edition = "2021"
 
@@ -53,6 +46,7 @@ cw20 = "1.1.0"
 schemars = "0.8.16"
 serde = { version = "1.0", default-features = false, features = ["derive"] }
 thiserror = "1.0"
+base64ct = "=1.6.0"
 
 [profile.release]
 opt-level = 3
@@ -116,38 +110,23 @@ use cosmwasm_std::{Addr, Uint128};
 
 #[cw_serde]
 pub struct InstantiateMsg {
-    /// Contract admin
     pub admin: String,
-    /// Minimum lock duration in seconds (default: 86400 = 24 hours)
     pub min_lock_duration: Option<u64>,
 }
 
 #[cw_serde]
 pub enum ExecuteMsg {
-    /// Receive and lock LP tokens (called by user via CW20 Send)
-    /// User must use LP token's Send function to this contract
     Receive(cw20::Cw20ReceiveMsg),
-    
-    /// Unlock and return LP tokens
     UnlockLp { lock_id: u64 },
-    
-    /// Emergency unlock (admin only)
     EmergencyUnlock { owner: String, lock_id: u64 },
-    
-    /// Pause contract (admin only)
     Pause {},
-    
-    /// Unpause contract (admin only)
     Unpause {},
-    
-    /// Update config (admin only)
     UpdateConfig {
         admin: Option<String>,
         min_lock_duration: Option<u64>,
     },
 }
 
-/// Message sent via CW20 Send to lock LP
 #[cw_serde]
 pub enum ReceiveMsg {
     LockLp { unlock_time: u64 },
@@ -158,17 +137,14 @@ pub enum ReceiveMsg {
 pub enum QueryMsg {
     #[returns(ConfigResponse)]
     Config {},
-    
     #[returns(LockInfoResponse)]
     LockInfo { owner: String, lock_id: u64 },
-    
     #[returns(AllLocksResponse)]
     AllLocks {
         owner: String,
         start_after: Option<u64>,
         limit: Option<u32>,
     },
-    
     #[returns(TotalLocksResponse)]
     TotalLocks {},
 }
@@ -631,29 +607,6 @@ EOF
 cd ../..
 
 echo ""
-echo -e "${GREEN}✓ Paxi LP Lock Contract Generated!${NC}"
+echo -e "${GREEN}✓ LP Lock Contract Generated!${NC}"
 echo ""
-echo -e "${CYAN}Design:${NC}"
-echo "  • Receives LP tokens via CW20 Send"
-echo "  • User creates LP via Paxi Swap Module first"
-echo "  • User sends LP tokens to this contract to lock"
-echo "  • Contract returns LP after unlock time"
-echo ""
-echo -e "${YELLOW}Important - Paxi Native Swap Module:${NC}"
-echo "  • Swap Module: paxi1mfru9azs5nua2wxcd4sq64g5nt7nn4n80r745t"
-echo "  • Users create LP outside this contract"
-echo "  • Then send LP tokens here to lock"
-echo ""
-echo -e "${BLUE}Next Steps:${NC}"
-echo "  1. cd $PROJECT_DIR"
-echo "  2. cargo build --release --target wasm32-unknown-unknown"
-echo "  3. Optimize with cosmwasm/optimizer:0.15.0"
-echo "  4. Deploy to Paxi mainnet"
-echo ""
-echo -e "${YELLOW}User Flow:${NC}"
-echo "  1. User adds liquidity via Paxi Swap Module"
-echo "  2. User receives LP tokens"
-echo "  3. User calls: LP_TOKEN.Send(LP_LOCK_CONTRACT, amount, {\"lock_lp\":{\"unlock_time\":...}})"
-echo "  4. LP tokens locked in contract"
-echo "  5. After unlock_time, user calls UnlockLp"
-echo ""
+echo -e "${CYAN}Next: ./build_lp_lock.sh${NC}"
