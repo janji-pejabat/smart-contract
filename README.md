@@ -681,4 +681,4 @@ Community:
 
 ## LICENSE
 
-MIT © 2025 seven0191
+MIT © 2025 paxi network community
