@@ -4,137 +4,106 @@ Build CosmWasm contracts dari HP Android!
 
 ---
 
-## ⚠️ INSTALL REQUIREMENTS DULU
+## 📋 REQUIREMENTS
 
-**JANGAN langsung curl install!** Setup ini dulu:
-
-### 1. Update Termux
-
-```bash
-pkg update && pkg upgrade -y
-```
-
-### 2. Install Basic Tools
-
-```bash
-pkg install curl git clang binutils binaryen jq bc -y
-```
-
-### 3. Install Rust
-
-```bash
-curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
-```
-
-Saat ditanya, pilih: **1** (Proceed with installation)
-
-### 4. Load Rust Environment
-
-```bash
-source $HOME/.cargo/env
-```
-
-Tambahkan ke `.bashrc` agar permanent:
-
-```bash
-echo 'source $HOME/.cargo/env' >> ~/.bashrc
-```
-
-### 5. Add WASM Target
-
-```bash
-rustup target add wasm32-unknown-unknown
-```
-
-### 6. Verify Installation
-
-```bash
-rustc --version
-cargo --version
-wasm-opt --version
-rustup target list | grep wasm32
-```
-
-Output harus:
-```
-rustc 1.81.0
-cargo 1.81.0  
-wasm-opt version 116
-wasm32-unknown-unknown (installed)
-```
+- Android 7.0+
+- 2GB+ RAM
+- 1GB storage free
+- Internet stabil
 
 ---
 
-## ✅ SEKARANG BARU INSTALL PAXI TOOLS
+## ⚡ INSTALLATION
+
+### 1. Setup Termux
+
+```bash
+pkg update && pkg upgrade -y
+pkg install curl git -y
+```
+
+### 2. Install Everything
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/janji-pejabat/smart-contract/main/install.sh | bash
 ```
 
----
+Tunggu 10-20 menit (download ~150MB)
 
-## 🚀 USAGE
+### 3. Reload Environment
 
 ```bash
-# Generate contract
+source ~/.bashrc
+# atau restart Termux
+```
+
+### 4. Verify
+
+```bash
+check-paxi
+```
+
+Output harus:
+```
+✓ Rust installed
+✓ Cargo installed  
+✓ wasm32 installed
+✓ wasm-opt installed
+✓ All ready!
+```
+
+---
+
+## 🚀 BUILD CONTRACT
+
+### Generate
+
+```bash
 paxi-generate
+# Pilih: 1 (LP Lock)
+```
 
-# Build contract  
+### Build
+
+```bash
 paxi-build
+# Pilih: 1 (LP Lock)
+# Tunggu 5-10 menit
+```
 
-# Deploy contract
+### Deploy
+
+```bash
 paxi-deploy
+# Ikuti wizard
 ```
 
 ---
 
 ## 🔧 TROUBLESHOOTING
 
-**Error: rustup not found**
-```bash
-# Install Rust dulu (lihat step 3-4 di atas)
-curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
-source $HOME/.cargo/env
-```
-
-**Error: wasm32 not found**
-```bash
-rustup target add wasm32-unknown-unknown
-```
-
-**Error: wasm-opt not found**
-```bash
-pkg install binaryen -y
-```
-
-**Out of memory saat build**
+**Out of memory:**
 ```bash
 export CARGO_BUILD_JOBS=1
 ```
 
-**Storage full**
+**Rust not found:**
+```bash
+source $HOME/.cargo/env
+```
+
+**Storage full:**
 ```bash
 cargo clean
-rm -rf ~/smart-contract/*/target
 ```
 
 ---
 
-## 📊 BUILD TIME
-
-| RAM | First Build | Next Build |
-|-----|-------------|------------|
-| 2GB | 10-15 min   | 3-5 min    |
-| 4GB | 6-10 min    | 2-3 min    |
-| 6GB+| 4-6 min     | 1-2 min    |
-
----
-
-## 🆘 SUPPORT
+## 🆘 HELP
 
 - Discord: https://discord.gg/rA9Xzs69tx
 - Telegram: https://t.me/paxi_network
 
 ---
 
-**MIT © 2025**
+**MIT License © 2025**
