@@ -1,325 +1,140 @@
-# 🚀 PANDUAN INSTALL PAXI CONTRACTS VIA GITHUB (TERMUX)
+# 🚀 PAXI SMART CONTRACTS - TERMUX
 
-## 📋 **CARA PALING MUDAH - AUTO INSTALL**
+Build CosmWasm contracts dari HP Android!
 
-### **Step 1: Buka Termux**
+---
+
+## ⚠️ INSTALL REQUIREMENTS DULU
+
+**JANGAN langsung curl install!** Setup ini dulu:
+
+### 1. Update Termux
 
 ```bash
-# Update Termux dulu
 pkg update && pkg upgrade -y
+```
 
-# Install curl & git (kalau belum ada)
-pkg install curl git -y
+### 2. Install Basic Tools
+
+```bash
+pkg install curl git clang binutils binaryen jq bc -y
+```
+
+### 3. Install Rust
+
+```bash
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+```
+
+Saat ditanya, pilih: **1** (Proceed with installation)
+
+### 4. Load Rust Environment
+
+```bash
+source $HOME/.cargo/env
+```
+
+Tambahkan ke `.bashrc` agar permanent:
+
+```bash
+echo 'source $HOME/.cargo/env' >> ~/.bashrc
+```
+
+### 5. Add WASM Target
+
+```bash
+rustup target add wasm32-unknown-unknown
+```
+
+### 6. Verify Installation
+
+```bash
+rustc --version
+cargo --version
+wasm-opt --version
+rustup target list | grep wasm32
+```
+
+Output harus:
+```
+rustc 1.81.0
+cargo 1.81.0  
+wasm-opt version 116
+wasm32-unknown-unknown (installed)
 ```
 
 ---
 
-### **Step 2: Download & Install (1 Command)**
-
-Ada 2 cara:
-
-#### **CARA A: Via Raw GitHub (Recommended - Paling Cepat)** ⚡
+## ✅ SEKARANG BARU INSTALL PAXI TOOLS
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/janji-pejabat/smart-contract/main/install.sh | bash
 ```
 
-#### **CARA B: Clone Repository Lengkap**
+---
+
+## 🚀 USAGE
 
 ```bash
-# Clone repo
-git clone https://github.com/janji-pejabat/smart-contract.git
+# Generate contract
+paxi-generate
 
-# Masuk folder
-cd smart-contract
+# Build contract  
+paxi-build
 
-# Jalankan installer
-chmod +x install_all.sh
-./install_all.sh
+# Deploy contract
+paxi-deploy
 ```
 
 ---
 
-## 📦 **SETUP REPOSITORY GITHUB (Untuk Creator/Developer)**
+## 🔧 TROUBLESHOOTING
 
-Jika Anda yang bikin repository, ini langkah-langkahnya:
-
-### **1. Buat Repository di GitHub**
-
+**Error: rustup not found**
 ```bash
-# Di browser:
-# 1. Buka github.com
-# 2. Click "New Repository"
-# 3. Nama: smart-contract
-# 4. Public/Private: Public
-# 5. Create Repository
+# Install Rust dulu (lihat step 3-4 di atas)
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+source $HOME/.cargo/env
 ```
 
-### **2. Upload Script ke GitHub**
-
+**Error: wasm32 not found**
 ```bash
-# Di Termux, dari folder smart-contract:
-
-# Init git
-git init
-
-# Add semua file
-git add .
-
-# Commit
-git commit -m "Initial commit - Paxi Smart Contracts Generator"
-
-# Connect ke GitHub
-git remote add origin https://github.com/janji-pejabat/smart-contract.git
-
-# Push
-git branch -M main
-git push -u origin main
+rustup target add wasm32-unknown-unknown
 ```
 
-### **3. Buat Install Script untuk User**
-
-Buat file baru: `install.sh`
-
+**Error: wasm-opt not found**
 ```bash
-nano install.sh
+pkg install binaryen -y
 ```
 
-Copy script ini:
-
+**Out of memory saat build**
 ```bash
-#!/data/data/com.termux/files/usr/bin/bash
-
-# PAXI CONTRACTS - ONE-CLICK INSTALLER
-# =====================================
-
-set -e
-
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-CYAN='\033[0;36m'
-NC='\033[0m'
-
-clear
-echo -e "${BLUE}"
-cat << "LOGO"
-╔═══════════════════════════════════════════════════════╗
-║                                                       ║
-║    ██████╗  █████╗ ██╗  ██╗██╗                      ║
-║    ██╔══██╗██╔══██╗╚██╗██╔╝██║                      ║
-║    ██████╔╝███████║ ╚███╔╝ ██║                      ║
-║    ██╔═══╝ ██╔══██║ ██╔██╗ ██║                      ║
-║    ██║     ██║  ██║██╔╝ ██╗██║                      ║
-║    ╚═╝     ╚═╝  ╚═╝╚═╝  ╚═╝╚═╝                      ║
-║                                                       ║
-║         SMART CONTRACT GENERATOR                     ║
-║              One-Click Installer                     ║
-║                                                       ║
-╚═══════════════════════════════════════════════════════╝
-LOGO
-echo -e "${NC}"
-
-echo -e "${YELLOW}Installing Paxi Smart Contracts Generator...${NC}"
-echo ""
-
-# Configuration
-REPO_URL="https://github.com/janji-pejabat/smart-contract"
-INSTALL_DIR="$HOME/smart-contract"
-
-# Check if already installed
-if [ -d "$INSTALL_DIR" ]; then
-    echo -e "${YELLOW}Paxi contracts already installed at $INSTALL_DIR${NC}"
-    read -p "Reinstall? This will delete existing files [y/n]: " REINSTALL
-    
-    if [ "$REINSTALL" = "y" ]; then
-        echo -e "${YELLOW}Removing old installation...${NC}"
-        rm -rf "$INSTALL_DIR"
-    else
-        echo "Installation cancelled."
-        exit 0
-    fi
-fi
-
-# Update Termux
-echo -e "${CYAN}[1/5] Updating Termux...${NC}"
-pkg update -y >/dev/null 2>&1
-
-# Install dependencies
-echo -e "${CYAN}[2/5] Installing dependencies...${NC}"
-pkg install -y git curl wget >/dev/null 2>&1
-
-# Clone repository
-echo -e "${CYAN}[3/5] Downloading from GitHub...${NC}"
-git clone "$REPO_URL" "$INSTALL_DIR"
-
-if [ $? -ne 0 ]; then
-    echo -e "${RED}Failed to download repository!${NC}"
-    echo "Please check your internet connection and repository URL."
-    exit 1
-fi
-
-cd "$INSTALL_DIR"
-
-# Make scripts executable
-echo -e "${CYAN}[4/5] Setting up permissions...${NC}"
-chmod +x *.sh
-
-# Run auto-installer
-echo -e "${CYAN}[5/5] Installing build tools...${NC}"
-echo ""
-
-if [ -f "install_all.sh" ]; then
-    ./install_all.sh
-else
-    echo -e "${YELLOW}Warning: install_all.sh not found.${NC}"
-    echo "You may need to install dependencies manually."
-fi
-
-echo ""
-echo -e "${GREEN}═══════════════════════════════════════${NC}"
-echo -e "${GREEN}  ✓ INSTALLATION COMPLETE!${NC}"
-echo -e "${GREEN}═══════════════════════════════════════${NC}"
-echo ""
-echo -e "${CYAN}Installation directory:${NC}"
-echo "  $INSTALL_DIR"
-echo ""
-echo -e "${CYAN}Next steps:${NC}"
-echo "  cd ~/smart-contract"
-echo "  ./check_requirements.sh    # Check if all tools installed"
-echo "  ./generate_contracts_smart.sh    # Start building!"
-echo ""
-echo -e "${YELLOW}Quick start guide:${NC}"
-echo "  cat QUICK_GUIDE.txt"
-echo ""
-echo -e "${GREEN}Happy Building! 🚀${NC}"
+export CARGO_BUILD_JOBS=1
 ```
 
-Save (Ctrl+X, Y, Enter)
-
-### **4. Test Install Script Locally**
-
+**Storage full**
 ```bash
-# Test di Termux
-chmod +x install.sh
-./install.sh
-```
-
-### **5. Commit & Push Install Script**
-
-```bash
-git add install.sh
-git commit -m "Add one-click installer"
-git push
+cargo clean
+rm -rf ~/smart-contract/*/target
 ```
 
 ---
 
-## 🌐 **CARA PAKAI UNTUK USER (SIMPEL!)**
+## 📊 BUILD TIME
 
-Setelah di-upload ke GitHub, user tinggal jalankan:
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/janji-pejabat/smart-contract/main/install.sh | bash
-```
-
-**SELESAI!** ✅
+| RAM | First Build | Next Build |
+|-----|-------------|------------|
+| 2GB | 10-15 min   | 3-5 min    |
+| 4GB | 6-10 min    | 2-3 min    |
+| 6GB+| 4-6 min     | 1-2 min    |
 
 ---
 
-## 📖 **BUAT README.md di GitHub**
-
-Buat file `README_INSTALL.md` untuk panduan user:
-
-```markdown
-# Paxi Smart Contracts - Termux Installation
-
-## 🚀 Quick Install (Termux)
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/janji-pejabat/smart-contract/main/install.sh | bash
-```
-
-## ✅ After Installation
-
-```bash
-cd ~/smart-contract
-./check_requirements.sh
-./generate_contracts_smart.sh
-```
-
-## 📚 Full Documentation
-
-See [README.md](README.md) for complete guide.
-
-## 🆘 Support
+## 🆘 SUPPORT
 
 - Discord: https://discord.gg/rA9Xzs69tx
 - Telegram: https://t.me/paxi_network
-```
 
 ---
 
-## 🎯 **CONTOH REAL WORLD**
-
-Misal repository Anda: `github.com/paxi-dev/smart-contract`
-
-User tinggal jalankan:
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/paxi-dev/smart-contract/main/install.sh | bash
-```
-
-Boom! Otomatis:
-1. ✅ Download semua script
-2. ✅ Install Rust
-3. ✅ Install WASM target
-4. ✅ Install binaryen
-5. ✅ Setup workspace
-6. ✅ Siap compile!
-
----
-
-## 🔒 **SECURITY NOTE**
-
-Untuk user yang hati-hati:
-
-```bash
-# Download dulu, baca scriptnya, baru jalankan
-curl -fsSL https://raw.githubusercontent.com/paxi-dev/smart-contract/main/install.sh -o install.sh
-
-# Baca isi script
-cat install.sh
-
-# Kalau OK, jalankan
-bash install.sh
-```
-
----
-
-## 📋 **CHECKLIST UPLOAD KE GITHUB**
-
-- [ ] Buat repository di GitHub
-- [ ] Upload semua file .sh
-- [ ] Buat install.sh untuk one-click install
-- [ ] Test install script
-- [ ] Buat README.md dengan instruksi
-- [ ] Set repository ke Public
-- [ ] Share link ke community!
-
----
-
-## 💡 **PRO TIP**
-
-Tambahkan di README.md utama:
-
-```markdown
-## Quick Install
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/janji-pejabat/smart-contract/main/install.sh | bash
-```
-
-One command, everything ready! 🚀
-```
+**MIT © 2025**
