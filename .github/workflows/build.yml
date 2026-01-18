@@ -1,30 +1,32 @@
-name: Build Paxi Contracts
+name: Build Paxi Smart Contracts
 
 on:
   push:
-    branches: [ main, develop ]
+    branches: [ main, master ]
   pull_request:
-    branches: [ main ]
+    branches: [ main, master ]
   workflow_dispatch:
 
 env:
-  RUST_VERSION: 1.83.0  # FIXED: Update dari 1.81.0 ke 1.83.0 untuk support edition2024
+  CARGO_TERM_COLOR: always
 
 jobs:
-  generate-and-build-lp-lock:
-    name: Generate & Build LP Lock
+  build-lp-lock:
+    name: Build LP Lock Contract
     runs-on: ubuntu-latest
+    
     steps:
-      - name: Checkout code
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
+      # CRITICAL FIX: Use Rust NIGHTLY (not stable)
+      # This is needed because transitive dependencies require edition2024
+      - name: Install Rust Nightly
+        uses: dtolnay/rust-toolchain@nightly
         with:
-          toolchain: ${{ env.RUST_VERSION }}
           targets: wasm32-unknown-unknown
 
-      - name: Cache cargo
+      - name: Cache Cargo registry
         uses: actions/cache@v4
         with:
           path: |
@@ -32,62 +34,67 @@ jobs:
             ~/.cargo/registry/index/
             ~/.cargo/registry/cache/
             ~/.cargo/git/db/
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-registry-
+
+      - name: Cache build artifacts
+        uses: actions/cache@v4
+        with:
+          path: |
+            contracts/prc20-lp-lock/target/
+          key: ${{ runner.os }}-lp-lock-${{ hashFiles('contracts/prc20-lp-lock/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-lp-lock-
 
       - name: Install wasm-opt
         run: |
-          wget https://github.com/WebAssembly/binaryen/releases/download/version_116/binaryen-version_116-x86_64-linux.tar.gz
-          tar -xzf binaryen-version_116-x86_64-linux.tar.gz
-          sudo cp binaryen-version_116/bin/wasm-opt /usr/local/bin/
-          wasm-opt --version
+          sudo apt-get update
+          sudo apt-get install -y binaryen
 
-      - name: Generate LP Lock contract
+      - name: Generate LP Lock Contract
         run: |
           chmod +x generate_lp_lock.sh
           ./generate_lp_lock.sh
 
-      - name: Build LP Lock
-        working-directory: contracts/prc20-lp-lock
+      - name: Build LP Lock Contract
         run: |
-          cargo build --release --target wasm32-unknown-unknown
-          ls -lh target/wasm32-unknown-unknown/release/
+          chmod +x build_lp_lock.sh
+          ./build_lp_lock.sh
+        env:
+          CARGO_BUILD_JOBS: 2
 
-      - name: Optimize WASM
-        working-directory: contracts/prc20-lp-lock
+      - name: Verify WASM output
         run: |
-          wasm-opt -Oz \
-            target/wasm32-unknown-unknown/release/prc20_lp_lock.wasm \
-            -o prc20_lp_lock_optimized.wasm
-          
-          SIZE=$(wc -c < prc20_lp_lock_optimized.wasm)
-          SIZE_KB=$((SIZE / 1024))
-          echo "Contract size: ${SIZE_KB}KB"
-          
-          if [ $SIZE -gt 800000 ]; then
-            echo "::warning::Contract size ${SIZE_KB}KB is large (>800KB)"
+          if [ ! -f "artifacts/prc20_lp_lock_optimized.wasm" ]; then
+            echo "ERROR: LP Lock WASM not found!"
+            exit 1
           fi
+          ls -lh artifacts/prc20_lp_lock_optimized.wasm
+          echo "✓ LP Lock build successful"
 
-      - name: Upload artifact
+      - name: Upload LP Lock Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: prc20-lp-lock
-          path: contracts/prc20-lp-lock/prc20_lp_lock_optimized.wasm
-          retention-days: 90
+          name: prc20-lp-lock-wasm
+          path: artifacts/prc20_lp_lock_optimized.wasm
+          retention-days: 30
 
-  generate-and-build-vesting:
-    name: Generate & Build Vesting
+  build-vesting:
+    name: Build Vesting Contract
     runs-on: ubuntu-latest
+    
     steps:
-      - name: Checkout code
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
+      # CRITICAL FIX: Use Rust NIGHTLY (not stable)
+      - name: Install Rust Nightly
+        uses: dtolnay/rust-toolchain@nightly
         with:
-          toolchain: ${{ env.RUST_VERSION }}
           targets: wasm32-unknown-unknown
 
-      - name: Cache cargo
+      - name: Cache Cargo registry
         uses: actions/cache@v4
         with:
           path: |
@@ -95,146 +102,101 @@ jobs:
             ~/.cargo/registry/index/
             ~/.cargo/registry/cache/
             ~/.cargo/git/db/
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-registry-
+
+      - name: Cache build artifacts
+        uses: actions/cache@v4
+        with:
+          path: |
+            contracts/prc20-vesting/target/
+          key: ${{ runner.os }}-vesting-${{ hashFiles('contracts/prc20-vesting/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-vesting-
 
       - name: Install wasm-opt
         run: |
-          wget https://github.com/WebAssembly/binaryen/releases/download/version_116/binaryen-version_116-x86_64-linux.tar.gz
-          tar -xzf binaryen-version_116-x86_64-linux.tar.gz
-          sudo cp binaryen-version_116/bin/wasm-opt /usr/local/bin/
-          wasm-opt --version
+          sudo apt-get update
+          sudo apt-get install -y binaryen
 
-      - name: Generate Vesting contract
+      - name: Generate Vesting Contract
         run: |
           chmod +x generate_vesting.sh
           ./generate_vesting.sh
 
-      - name: Build Vesting
-        working-directory: contracts/prc20-vesting
+      - name: Build Vesting Contract
         run: |
-          cargo build --release --target wasm32-unknown-unknown
-          ls -lh target/wasm32-unknown-unknown/release/
+          chmod +x build_vesting.sh
+          ./build_vesting.sh
+        env:
+          CARGO_BUILD_JOBS: 2
 
-      - name: Optimize WASM
-        working-directory: contracts/prc20-vesting
+      - name: Verify WASM output
         run: |
-          wasm-opt -Oz \
-            target/wasm32-unknown-unknown/release/prc20_vesting.wasm \
-            -o prc20_vesting_optimized.wasm
-          
-          SIZE=$(wc -c < prc20_vesting_optimized.wasm)
-          SIZE_KB=$((SIZE / 1024))
-          echo "Contract size: ${SIZE_KB}KB"
-          
-          if [ $SIZE -gt 800000 ]; then
-            echo "::warning::Contract size ${SIZE_KB}KB is large (>800KB)"
+          if [ ! -f "artifacts/prc20_vesting_optimized.wasm" ]; then
+            echo "ERROR: Vesting WASM not found!"
+            exit 1
           fi
+          ls -lh artifacts/prc20_vesting_optimized.wasm
+          echo "✓ Vesting build successful"
 
-      - name: Upload artifact
+      - name: Upload Vesting Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: prc20-vesting
-          path: contracts/prc20-vesting/prc20_vesting_optimized.wasm
-          retention-days: 90
+          name: prc20-vesting-wasm
+          path: artifacts/prc20_vesting_optimized.wasm
+          retention-days: 30
 
   create-release:
-    name: Create Release
-    needs: [generate-and-build-lp-lock, generate-and-build-vesting]
+    name: Create Release Assets
     runs-on: ubuntu-latest
+    needs: [build-lp-lock, build-vesting]
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-    permissions:
-      contents: write
+    
     steps:
-      - name: Checkout code
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Download LP Lock artifact
+      - name: Download LP Lock WASM
         uses: actions/download-artifact@v4
         with:
-          name: prc20-lp-lock
-          path: artifacts/
+          name: prc20-lp-lock-wasm
+          path: release/
 
-      - name: Download Vesting artifact
+      - name: Download Vesting WASM
         uses: actions/download-artifact@v4
         with:
-          name: prc20-vesting
-          path: artifacts/
+          name: prc20-vesting-wasm
+          path: release/
 
       - name: Generate checksums
-        working-directory: artifacts
         run: |
+          cd release
           sha256sum prc20_lp_lock_optimized.wasm > checksums.txt
           sha256sum prc20_vesting_optimized.wasm >> checksums.txt
           cat checksums.txt
 
-      - name: Get version
-        id: version
-        run: echo "VERSION=v$(date +'%Y%m%d-%H%M%S')" >> $GITHUB_OUTPUT
+      - name: Get contract info
+        run: |
+          echo "## Paxi Smart Contracts" > release_notes.md
+          echo "" >> release_notes.md
+          echo "### Contract Sizes" >> release_notes.md
+          echo "- **LP Lock**: $(ls -lh release/prc20_lp_lock_optimized.wasm | awk '{print $5}')" >> release_notes.md
+          echo "- **Vesting**: $(ls -lh release/prc20_vesting_optimized.wasm | awk '{print $5}')" >> release_notes.md
+          echo "" >> release_notes.md
+          echo "### SHA256 Checksums" >> release_notes.md
+          echo '```' >> release_notes.md
+          cat release/checksums.txt >> release_notes.md
+          echo '```' >> release_notes.md
+          cat release_notes.md
 
-      - name: Create Release
-        uses: softprops/action-gh-release@v1
+      - name: Upload Release Assets
+        uses: actions/upload-artifact@v4
         with:
-          tag_name: ${{ steps.version.outputs.VERSION }}
-          name: Release ${{ steps.version.outputs.VERSION }}
-          body: |
-            ## Paxi Smart Contracts Build
-            
-            **Build Date:** $(date +'%Y-%m-%d %H:%M:%S UTC')
-            **Commit:** ${{ github.sha }}
-            
-            ### Contracts Included:
-            - ✅ LP Lock Contract (`prc20_lp_lock_optimized.wasm`)
-            - ✅ Vesting Contract (`prc20_vesting_optimized.wasm`)
-            
-            ### Security Features:
-            **LP Lock:**
-            - Overflow protection with checked arithmetic
-            - Reentrancy protection
-            - Access control enforcement
-            - Input validation
-            - Safe math operations
-            
-            **Vesting:**
-            - Cliff period support
-            - Linear vesting calculation
-            - Revoke functionality (owner only)
-            - Reentrancy protection
-            - Safe time calculations
-            
-            ### Download & Verify:
-            ```bash
-            # Download contracts
-            wget https://github.com/${{ github.repository }}/releases/download/${{ steps.version.outputs.VERSION }}/prc20_lp_lock_optimized.wasm
-            wget https://github.com/${{ github.repository }}/releases/download/${{ steps.version.outputs.VERSION }}/prc20_vesting_optimized.wasm
-            wget https://github.com/${{ github.repository }}/releases/download/${{ steps.version.outputs.VERSION }}/checksums.txt
-            
-            # Verify checksums
-            sha256sum -c checksums.txt
-            ```
-            
-            ### Deploy to Paxi:
-            ```bash
-            # Deploy LP Lock
-            paxid tx wasm store prc20_lp_lock_optimized.wasm \
-              --from wallet-name \
-              --gas 3000000 \
-              --fees 15000upaxi \
-              --chain-id paxi-testnet-1 \
-              --yes
-            
-            # Deploy Vesting
-            paxid tx wasm store prc20_vesting_optimized.wasm \
-              --from wallet-name \
-              --gas 3000000 \
-              --fees 15000upaxi \
-              --chain-id paxi-testnet-1 \
-              --yes
-            ```
-          files: |
-            artifacts/prc20_lp_lock_optimized.wasm
-            artifacts/prc20_vesting_optimized.wasm
-            artifacts/checksums.txt
-          draft: false
-          prerelease: false
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          name: paxi-contracts-release
+          path: |
+            release/prc20_lp_lock_optimized.wasm
+            release/prc20_vesting_optimized.wasm
+            release/checksums.txt
+          retention-days: 90
