@@ -40,68 +40,37 @@ Package yang diinstall:
 - jq: JSON processor
 - bc: calculator untuk script
 
-### Install Rust
+### Install Rust (Termux)
 
 ```bash
-curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+pkg install rust -y
 ```
 
-Saat muncul pilihan:
-```
-1) Proceed with installation (default)
-2) Customize installation
-3) Cancel installation
-```
+**PENTING:** Di Termux, Rust sudah include wasm32 target. Tidak perlu rustup.
 
-Ketik angka 1, tekan Enter.
+Proses install Rust biasanya 2-5 menit tergantung koneksi internet.
 
-Proses install Rust biasanya 5-10 menit tergantung koneksi internet.
-
-### Load Rust ke Environment
-
-Setelah install Rust selesai:
-
-```bash
-source $HOME/.cargo/env
-```
-
-Agar permanent tiap buka Termux:
-
-```bash
-echo 'source $HOME/.cargo/env' >> ~/.bashrc
-```
-
-### Install WASM Target
-
-```bash
-rustup target add wasm32-unknown-unknown
-```
-
-Target ini diperlukan untuk compile contract ke WebAssembly format.
-
-### Verifikasi Semua Terinstall
-
-Cek satu-satu:
+### Verifikasi Rust Terinstall
 
 ```bash
 rustc --version
 ```
-Output: `rustc 1.81.0` atau versi terbaru
+Output: `rustc 1.92.0` atau versi terbaru
 
 ```bash
 cargo --version
 ```
-Output: `cargo 1.81.0` atau versi terbaru
+Output: `cargo 1.92.0` atau versi terbaru
 
 ```bash
 wasm-opt --version
 ```
-Output: `wasm-opt version 116` atau versi terbaru
+Output: `wasm-opt version 125` atau versi terbaru
 
 ```bash
-rustup target list | grep wasm32
+rustc --print target-list | grep wasm32
 ```
-Output harus ada: `wasm32-unknown-unknown (installed)`
+Output harus ada: `wasm32-unknown-unknown`
 
 Kalau semua command di atas berhasil, lanjut ke step berikutnya.
 
@@ -112,16 +81,28 @@ Kalau semua command di atas berhasil, lanjut ke step berikutnya.
 Download script generator dari GitHub:
 
 ```bash
-# LP Lock Contract
-curl -O https://raw.githubusercontent.com/janji-pejabat/repo/main/generate_lp_lock.sh
-curl -O https://raw.githubusercontent.com/janji-pejabat/repo/main/build_lp_lock.sh
-chmod +x generate_lp_lock.sh build_lp_lock.sh
+# Buat folder kerja
+mkdir -p ~/paxi-contracts
+cd ~/paxi-contracts
 
-# Vesting Contract
-curl -O https://raw.githubusercontent.com/janji-pejabat/repo/main/generate_vesting.sh
-curl -O https://raw.githubusercontent.com/janji-pejabat/repo/main/build_vesting.sh
-chmod +x generate_vesting.sh build_vesting.sh
+# Download LP Lock scripts
+curl -fsSL https://raw.githubusercontent.com/janji-pejabat/smart-contract/main/generate_lp_lock.sh -o generate_lp_lock.sh
+curl -fsSL https://raw.githubusercontent.com/janji-pejabat/smart-contract/main/build_lp_lock.sh -o build_lp_lock.sh
+
+# Download Vesting scripts
+curl -fsSL https://raw.githubusercontent.com/janji-pejabat/smart-contract/main/generate_vesting.sh -o generate_vesting.sh
+curl -fsSL https://raw.githubusercontent.com/janji-pejabat/smart-contract/main/build_vesting.sh -o build_vesting.sh
+
+# Set executable
+chmod +x *.sh
 ```
+
+Atau download semua sekaligus:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/janji-pejabat/smart-contract/main/install.sh | bash
+```
+
 ---
 
 ## GENERATE & BUILD CONTRACTS
@@ -182,29 +163,30 @@ File hasil: `artifacts/prc20_vesting_optimized.wasm`
 
 ### Error: rustup command not found
 
-Rust belum terinstall atau belum di-load ke environment.
+Di Termux, tidak pakai rustup. Rust diinstall via pkg.
 
 Solusi:
 ```bash
-# Cek apakah Rust sudah terinstall
-ls ~/.cargo/bin/
+# Install Rust dari Termux package
+pkg install rust -y
 
-# Kalau ada file rustup, cargo, rustc berarti sudah terinstall
-# Tinggal load environment
-source $HOME/.cargo/env
-
-# Kalau folder tidak ada, install Rust dulu
-curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
-source $HOME/.cargo/env
+# Cek versi
+rustc --version
+cargo --version
 ```
 
 ### Error: wasm32-unknown-unknown not installed
 
-Target WASM belum ditambahkan.
+Di Termux, wasm32 target sudah include di package rust.
 
-Solusi:
+Cek apakah tersedia:
 ```bash
-rustup target add wasm32-unknown-unknown
+rustc --print target-list | grep wasm32
+```
+
+Kalau tidak ada, reinstall rust:
+```bash
+pkg reinstall rust -y
 ```
 
 ### Error: wasm-opt not found
@@ -699,4 +681,4 @@ Community:
 
 ## LICENSE
 
-MIT © 2025 Paxi Network Contributors
+MIT © 2025 seven0191
