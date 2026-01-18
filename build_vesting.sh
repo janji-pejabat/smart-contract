@@ -45,7 +45,7 @@ fi
 
 echo ""
 echo -e "${CYAN}[2/3] Optimizing with wasm-opt...${NC}"
-wasm-opt -Oz target/wasm32-unknown-unknown/release/prc20_vesting.wasm \
+wasm-opt -Oz --enable-sign-ext target/wasm32-unknown-unknown/release/prc20_vesting.wasm \
     -o target/wasm32-unknown-unknown/release/prc20_vesting_optimized.wasm
 
 if [ $? -ne 0 ]; then
