@@ -20,6 +20,7 @@ fi
 
 if ! rustc --print target-list | grep -q "wasm32-unknown-unknown"; then
     echo -e "${RED}✗ wasm32-unknown-unknown tidak tersedia!${NC}"
+    echo "Reinstall rust: pkg reinstall rust -y"
     exit 1
 fi
 
@@ -523,48 +524,19 @@ EOF
 
 cd ..
 
-cat > build_vesting.sh << 'BUILDEOF'
-#!/data/data/com.termux/files/usr/bin/bash
-
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-NC='\033[0m'
-
-echo -e "${YELLOW}Building Vesting Contract...${NC}"
-
-cd prc20-vesting
-
-echo -e "${YELLOW}[1/3] Compiling...${NC}"
-cargo build --release --target wasm32-unknown-unknown
-
-if [ $? -ne 0 ]; then
-    echo -e "${RED}✗ Build failed${NC}"
-    exit 1
-fi
-
-if ! command -v wasm-opt &> /dev/null; then
-    echo -e "${YELLOW}wasm-opt not found. Install: pkg install binaryen${NC}"
-    exit 1
-fi
-
-echo -e "${YELLOW}[2/3] Optimizing...${NC}"
-wasm-opt -Oz \
-    target/wasm32-unknown-unknown/release/prc20_vesting.wasm \
-    -o prc20_vesting_optimized.wasm
-
-echo -e "${YELLOW}[3/3] Finalizing...${NC}"
-cd ..
-mkdir -p artifacts
-cp prc20-vesting/prc20_vesting_optimized.wasm artifacts/
-
-SIZE=$(du -h artifacts/prc20_vesting_optimized.wasm | cut -f1)
-echo -e "${GREEN}✓ Build complete: ${SIZE}${NC}"
-echo -e "${GREEN}→ artifacts/prc20_vesting_optimized.wasm${NC}"
-BUILDEOF
-
-chmod +x build_vesting.sh
-
-echo -e "${GREEN}✓ Vesting contract generated${NC}"
 echo ""
-echo "Next: ./build_vesting.sh"
+echo -e "${GREEN}=========================================="
+echo "  ✓ Vesting Contract Generated!"
+echo "==========================================${NC}"
+echo ""
+echo -e "${CYAN}Files created:${NC}"
+echo "  prc20-vesting/src/contract.rs"
+echo "  prc20-vesting/src/msg.rs"
+echo "  prc20-vesting/src/state.rs"
+echo "  prc20-vesting/src/error.rs"
+echo "  prc20-vesting/src/lib.rs"
+echo "  prc20-vesting/Cargo.toml"
+echo ""
+echo -e "${YELLOW}Next step:${NC}"
+echo "  ./build_vesting.sh"
+echo ""
