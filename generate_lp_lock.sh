@@ -1,59 +1,59 @@
-#!/bin/bash
+#!/usr/bin/env bash
+# paxi network
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m'
 
-# Generate PRC20 LP Lock Smart Contract untuk Paxi Network
-# Fixed: Lock dependencies ke versions yang tidak require edition2024
+clear
+echo -e "${BLUE}=========================================="
+echo "  LP LOCK CONTRACT GENERATOR"
+echo "==========================================${NC}"
 
-set -e
+# Cek Rust
+if ! command -v cargo &> /dev/null; then
+    echo -e "${RED}✗ Rust tidak ditemukan!${NC}"
+    echo "Install: pkg install rust -y"
+    exit 1
+fi
 
-PROJECT_NAME="prc20-lp-lock"
-CONTRACT_NAME="prc20_lp_lock"
+# Cek wasm target (Termux rust sudah include wasm32)
+if ! rustc --print target-list | grep -q "wasm32-unknown-unknown"; then
+    echo -e "${RED}✗ wasm32-unknown-unknown tidak tersedia!${NC}"
+    echo "Reinstall rust: pkg reinstall rust -y"
+    exit 1
+fi
 
-echo "🚀 Generating $PROJECT_NAME contract..."
+echo -e "${GREEN}✓ Requirements OK${NC}"
+echo ""
 
-# Create project structure
-mkdir -p $PROJECT_NAME/src
-cd $PROJECT_NAME
+# Create project
+mkdir -p contracts/prc20-lp-lock/src
+cd contracts/prc20-lp-lock
 
-# Generate Cargo.toml dengan dependency versions yang fixed
 cat > Cargo.toml << 'EOF'
 [package]
-name = "prc20_lp_lock"
+name = "prc20-lp-lock"
 version = "1.0.0"
-authors = ["Paxi Network Community"]
 edition = "2021"
 
 [lib]
 crate-type = ["cdylib", "rlib"]
 
-[profile.release]
-opt-level = 3
-debug = false
-rpath = false
-lto = true
-debug-assertions = false
-codegen-units = 1
-panic = 'abort'
-incremental = false
-overflow-checks = true
-
-[features]
-default = []
-library = []
-
 [dependencies]
-cosmwasm-std = "1.5.0"
-cosmwasm-storage = "1.5.0"
-cw-storage-plus = "1.2.0"
-cw2 = "1.1.0"
-schemars = "0.8.16"
-serde = { version = "1.0.195", default-features = false, features = ["derive"] }
-thiserror = "1.0.56"
+cosmwasm-std = "2.2.0"
+cosmwasm-schema = "2.2.0"
+cw-storage-plus = "2.0.0"
+cw2 = "2.0.0"
+schemars = "0.8"
+serde = { version = "1.0", default-features = false, features = ["derive"] }
+thiserror = "2.0"
 
 [dev-dependencies]
-cosmwasm-schema = "1.5.0"
+cw-multi-test = "2.2.0"
 EOF
 
-# Generate lib.rs
 cat > src/lib.rs << 'EOF'
 pub mod contract;
 pub mod error;
@@ -63,169 +63,151 @@ pub mod state;
 pub use crate::error::ContractError;
 EOF
 
-# Generate error.rs
+cat > src/msg.rs << 'EOF'
+use cosmwasm_schema::{cw_serde, QueryResponses};
+use cosmwasm_std::{Addr, Uint128};
+
+#[cw_serde]
+pub struct InstantiateMsg {}
+
+#[cw_serde]
+pub enum ExecuteMsg {
+    LockByHeight {
+        token_addr: String,
+        amount: Uint128,
+        unlock_height: u64,
+    },
+    LockByTime {
+        token_addr: String,
+        amount: Uint128,
+        unlock_time: u64,
+    },
+    Unlock { lock_id: u64 },
+}
+
+#[cw_serde]
+#[derive(QueryResponses)]
+pub enum QueryMsg {
+    #[returns(TotalLockedResponse)]
+    TotalLocked { token_addr: String },
+    #[returns(LockInfoResponse)]
+    LockInfo { owner: String, lock_id: u64 },
+    #[returns(AllLocksResponse)]
+    AllLocks { owner: String },
+}
+
+#[cw_serde]
+pub struct TotalLockedResponse {
+    pub token_addr: String,
+    pub total_locked: Uint128,
+}
+
+#[cw_serde]
+pub struct LockInfo {
+    pub lock_id: u64,
+    pub owner: Addr,
+    pub token_addr: Addr,
+    pub amount: Uint128,
+    pub unlock_condition: UnlockCondition,
+    pub is_unlocked: bool,
+}
+
+#[cw_serde]
+pub enum UnlockCondition {
+    Height { height: u64 },
+    Time { timestamp: u64 },
+}
+
+#[cw_serde]
+pub struct LockInfoResponse {
+    pub lock: LockInfo,
+}
+
+#[cw_serde]
+pub struct AllLocksResponse {
+    pub locks: Vec<LockInfo>,
+}
+EOF
+
+cat > src/state.rs << 'EOF'
+use cosmwasm_std::{Addr, Uint128};
+use cw_storage_plus::{Item, Map};
+use schemars::JsonSchema;
+use serde::{Deserialize, Serialize};
+use crate::msg::UnlockCondition;
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+pub struct Lock {
+    pub lock_id: u64,
+    pub owner: Addr,
+    pub token_addr: Addr,
+    pub amount: Uint128,
+    pub unlock_condition: UnlockCondition,
+    pub is_unlocked: bool,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+pub struct Config {
+    pub lock_counter: u64,
+}
+
+pub const CONFIG: Item<Config> = Item::new("config");
+pub const LOCKS: Map<(Addr, u64), Lock> = Map::new("locks");
+pub const TOTAL_LOCKED: Map<Addr, Uint128> = Map::new("total_locked");
+EOF
+
 cat > src/error.rs << 'EOF'
 use cosmwasm_std::StdError;
 use thiserror::Error;
 
-#[derive(Error, Debug)]
+#[derive(Error, Debug, PartialEq)]
 pub enum ContractError {
     #[error("{0}")]
     Std(#[from] StdError),
-
     #[error("Unauthorized")]
     Unauthorized {},
-
     #[error("Lock not found")]
     LockNotFound {},
-
-    #[error("Lock still active")]
-    LockStillActive {},
-
-    #[error("Lock already unlocked")]
+    #[error("Tokens still locked")]
+    TokensStillLocked {},
+    #[error("Already unlocked")]
     AlreadyUnlocked {},
-
-    #[error("Invalid lock time")]
-    InvalidLockTime {},
-
-    #[error("Invalid lock height")]
-    InvalidLockHeight {},
-
-    #[error("Invalid amount")]
+    #[error("Invalid unlock height")]
+    InvalidUnlockHeight {},
+    #[error("Invalid unlock time")]
+    InvalidUnlockTime {},
+    #[error("Amount must be greater than zero")]
     InvalidAmount {},
-
-    #[error("Overflow in calculation")]
-    Overflow {},
 }
 EOF
 
-# Generate state.rs
-cat > src/state.rs << 'EOF'
-use cosmwasm_std::Addr;
-use cw_storage_plus::{Item, Map};
-use schemars::JsonSchema;
-use serde::{Deserialize, Serialize};
-
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-pub struct Config {
-    pub owner: Addr,
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-pub struct LockInfo {
-    pub owner: Addr,
-    pub token_addr: Addr,
-    pub amount: u128,
-    pub unlock_time: Option<u64>,
-    pub unlock_height: Option<u64>,
-    pub is_unlocked: bool,
-}
-
-pub const CONFIG: Item<Config> = Item::new("config");
-pub const LOCK_COUNTER: Item<u64> = Item::new("lock_counter");
-pub const LOCKS: Map<(Addr, u64), LockInfo> = Map::new("locks");
-pub const TOTAL_LOCKED: Map<Addr, u128> = Map::new("total_locked");
-EOF
-
-# Generate msg.rs
-cat > src/msg.rs << 'EOF'
-use cosmwasm_std::Addr;
-use schemars::JsonSchema;
-use serde::{Deserialize, Serialize};
-
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-pub struct InstantiateMsg {}
-
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum ExecuteMsg {
-    LockByTime {
-        token_addr: String,
-        amount: String,
-        unlock_time: u64,
-    },
-    LockByHeight {
-        token_addr: String,
-        amount: String,
-        unlock_height: u64,
-    },
-    Unlock {
-        lock_id: u64,
-    },
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum QueryMsg {
-    Config {},
-    LockInfo { owner: String, lock_id: u64 },
-    TotalLocked { token_addr: String },
-    AllLocks { owner: String },
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-pub struct ConfigResponse {
-    pub owner: Addr,
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-pub struct LockInfoResponse {
-    pub owner: Addr,
-    pub token_addr: Addr,
-    pub amount: String,
-    pub unlock_time: Option<u64>,
-    pub unlock_height: Option<u64>,
-    pub is_unlocked: bool,
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-pub struct TotalLockedResponse {
-    pub token_addr: Addr,
-    pub total_amount: String,
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-pub struct AllLocksResponse {
-    pub locks: Vec<(u64, LockInfoResponse)>,
-}
-EOF
-
-# Generate contract.rs
 cat > src/contract.rs << 'EOF'
 use cosmwasm_std::{
-    entry_point, to_json_binary, Addr, Binary, Deps, DepsMut, Env, MessageInfo, Response,
-    StdResult, Uint128, WasmMsg, CosmosMsg,
+    entry_point, to_json_binary, Binary, Deps, DepsMut, Env, MessageInfo, 
+    Response, StdResult, Uint128, WasmMsg, Order
 };
 use cw2::set_contract_version;
-
 use crate::error::ContractError;
-use crate::msg::{
-    ExecuteMsg, InstantiateMsg, QueryMsg, ConfigResponse, LockInfoResponse,
-    TotalLockedResponse, AllLocksResponse,
-};
-use crate::state::{Config, LockInfo, CONFIG, LOCK_COUNTER, LOCKS, TOTAL_LOCKED};
+use crate::msg::{ExecuteMsg, InstantiateMsg, QueryMsg, LockInfo, LockInfoResponse, 
+    AllLocksResponse, TotalLockedResponse, UnlockCondition};
+use crate::state::{CONFIG, LOCKS, TOTAL_LOCKED, Config, Lock};
 
-const CONTRACT_NAME: &str = "crates.io:prc20-lp-lock";
+const CONTRACT_NAME: &str = "paxi:prc20-lp-lock";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 #[entry_point]
 pub fn instantiate(
     deps: DepsMut,
     _env: Env,
-    info: MessageInfo,
+    _info: MessageInfo,
     _msg: InstantiateMsg,
 ) -> Result<Response, ContractError> {
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
-
-    let config = Config {
-        owner: info.sender.clone(),
-    };
+    let config = Config { lock_counter: 0 };
     CONFIG.save(deps.storage, &config)?;
-    LOCK_COUNTER.save(deps.storage, &0)?;
-
     Ok(Response::new()
-        .add_attribute("method", "instantiate")
-        .add_attribute("owner", info.sender))
+        .add_attribute("action", "instantiate")
+        .add_attribute("contract", CONTRACT_NAME))
 }
 
 #[entry_point]
@@ -236,288 +218,278 @@ pub fn execute(
     msg: ExecuteMsg,
 ) -> Result<Response, ContractError> {
     match msg {
-        ExecuteMsg::LockByTime {
-            token_addr,
-            amount,
-            unlock_time,
-        } => execute_lock_by_time(deps, env, info, token_addr, amount, unlock_time),
-        ExecuteMsg::LockByHeight {
-            token_addr,
-            amount,
-            unlock_height,
-        } => execute_lock_by_height(deps, env, info, token_addr, amount, unlock_height),
-        ExecuteMsg::Unlock { lock_id } => execute_unlock(deps, env, info, lock_id),
+        ExecuteMsg::LockByHeight { token_addr, amount, unlock_height } => {
+            execute_lock_by_height(deps, env, info, token_addr, amount, unlock_height)
+        }
+        ExecuteMsg::LockByTime { token_addr, amount, unlock_time } => {
+            execute_lock_by_time(deps, env, info, token_addr, amount, unlock_time)
+        }
+        ExecuteMsg::Unlock { lock_id } => {
+            execute_unlock(deps, env, info, lock_id)
+        }
     }
 }
 
-pub fn execute_lock_by_time(
+fn execute_lock_by_height(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
     token_addr: String,
-    amount: String,
-    unlock_time: u64,
-) -> Result<Response, ContractError> {
-    let token_addr = deps.api.addr_validate(&token_addr)?;
-    let amount_u128: u128 = amount.parse().map_err(|_| ContractError::InvalidAmount {})?;
-
-    if amount_u128 == 0 {
-        return Err(ContractError::InvalidAmount {});
-    }
-
-    if unlock_time <= env.block.time.seconds() {
-        return Err(ContractError::InvalidLockTime {});
-    }
-
-    let mut lock_counter = LOCK_COUNTER.load(deps.storage)?;
-    lock_counter = lock_counter.checked_add(1).ok_or(ContractError::Overflow {})?;
-
-    let lock_info = LockInfo {
-        owner: info.sender.clone(),
-        token_addr: token_addr.clone(),
-        amount: amount_u128,
-        unlock_time: Some(unlock_time),
-        unlock_height: None,
-        is_unlocked: false,
-    };
-
-    LOCKS.save(deps.storage, (info.sender.clone(), lock_counter), &lock_info)?;
-    LOCK_COUNTER.save(deps.storage, &lock_counter)?;
-
-    let current_total = TOTAL_LOCKED
-        .may_load(deps.storage, token_addr.clone())?
-        .unwrap_or(0);
-    let new_total = current_total.checked_add(amount_u128).ok_or(ContractError::Overflow {})?;
-    TOTAL_LOCKED.save(deps.storage, token_addr.clone(), &new_total)?;
-
-    let transfer_msg = WasmMsg::Execute {
-        contract_addr: token_addr.to_string(),
-        msg: to_json_binary(&cw20::Cw20ExecuteMsg::TransferFrom {
-            owner: info.sender.to_string(),
-            recipient: env.contract.address.to_string(),
-            amount: Uint128::from(amount_u128),
-        })?,
-        funds: vec![],
-    };
-
-    Ok(Response::new()
-        .add_message(CosmosMsg::Wasm(transfer_msg))
-        .add_attribute("method", "lock_by_time")
-        .add_attribute("lock_id", lock_counter.to_string())
-        .add_attribute("owner", info.sender)
-        .add_attribute("amount", amount)
-        .add_attribute("unlock_time", unlock_time.to_string()))
-}
-
-pub fn execute_lock_by_height(
-    deps: DepsMut,
-    env: Env,
-    info: MessageInfo,
-    token_addr: String,
-    amount: String,
+    amount: Uint128,
     unlock_height: u64,
 ) -> Result<Response, ContractError> {
-    let token_addr = deps.api.addr_validate(&token_addr)?;
-    let amount_u128: u128 = amount.parse().map_err(|_| ContractError::InvalidAmount {})?;
-
-    if amount_u128 == 0 {
+    // Validasi amount
+    if amount.is_zero() {
         return Err(ContractError::InvalidAmount {});
     }
-
+    
+    // Validasi unlock_height harus di masa depan
     if unlock_height <= env.block.height {
-        return Err(ContractError::InvalidLockHeight {});
+        return Err(ContractError::InvalidUnlockHeight {});
     }
-
-    let mut lock_counter = LOCK_COUNTER.load(deps.storage)?;
-    lock_counter = lock_counter.checked_add(1).ok_or(ContractError::Overflow {})?;
-
-    let lock_info = LockInfo {
+    
+    let token_addr = deps.api.addr_validate(&token_addr)?;
+    
+    // Increment lock counter dengan protection overflow
+    let mut config = CONFIG.load(deps.storage)?;
+    config.lock_counter = config.lock_counter.checked_add(1)
+        .ok_or(ContractError::Std(cosmwasm_std::StdError::generic_err("Lock counter overflow")))?;
+    let lock_id = config.lock_counter;
+    
+    let lock = Lock {
+        lock_id,
         owner: info.sender.clone(),
         token_addr: token_addr.clone(),
-        amount: amount_u128,
-        unlock_time: None,
-        unlock_height: Some(unlock_height),
+        amount,
+        unlock_condition: UnlockCondition::Height { height: unlock_height },
         is_unlocked: false,
     };
-
-    LOCKS.save(deps.storage, (info.sender.clone(), lock_counter), &lock_info)?;
-    LOCK_COUNTER.save(deps.storage, &lock_counter)?;
-
+    
+    LOCKS.save(deps.storage, (info.sender.clone(), lock_id), &lock)?;
+    CONFIG.save(deps.storage, &config)?;
+    
+    // Update total locked dengan safe math
     let current_total = TOTAL_LOCKED
         .may_load(deps.storage, token_addr.clone())?
-        .unwrap_or(0);
-    let new_total = current_total.checked_add(amount_u128).ok_or(ContractError::Overflow {})?;
+        .unwrap_or_default();
+    let new_total = current_total.checked_add(amount)?;
     TOTAL_LOCKED.save(deps.storage, token_addr.clone(), &new_total)?;
-
+    
     let transfer_msg = WasmMsg::Execute {
         contract_addr: token_addr.to_string(),
-        msg: to_json_binary(&cw20::Cw20ExecuteMsg::TransferFrom {
+        msg: to_json_binary(&Prc20ExecuteMsg::TransferFrom {
             owner: info.sender.to_string(),
             recipient: env.contract.address.to_string(),
-            amount: Uint128::from(amount_u128),
+            amount,
         })?,
         funds: vec![],
     };
-
+    
     Ok(Response::new()
-        .add_message(CosmosMsg::Wasm(transfer_msg))
-        .add_attribute("method", "lock_by_height")
-        .add_attribute("lock_id", lock_counter.to_string())
+        .add_message(transfer_msg)
+        .add_attribute("action", "lock_by_height")
+        .add_attribute("lock_id", lock_id.to_string())
         .add_attribute("owner", info.sender)
+        .add_attribute("token", token_addr)
         .add_attribute("amount", amount)
         .add_attribute("unlock_height", unlock_height.to_string()))
 }
 
-pub fn execute_unlock(
+fn execute_lock_by_time(
+    deps: DepsMut,
+    env: Env,
+    info: MessageInfo,
+    token_addr: String,
+    amount: Uint128,
+    unlock_time: u64,
+) -> Result<Response, ContractError> {
+    if amount.is_zero() {
+        return Err(ContractError::InvalidAmount {});
+    }
+    
+    if unlock_time <= env.block.time.seconds() {
+        return Err(ContractError::InvalidUnlockTime {});
+    }
+    
+    let token_addr = deps.api.addr_validate(&token_addr)?;
+    
+    let mut config = CONFIG.load(deps.storage)?;
+    config.lock_counter = config.lock_counter.checked_add(1)
+        .ok_or(ContractError::Std(cosmwasm_std::StdError::generic_err("Lock counter overflow")))?;
+    let lock_id = config.lock_counter;
+    
+    let lock = Lock {
+        lock_id,
+        owner: info.sender.clone(),
+        token_addr: token_addr.clone(),
+        amount,
+        unlock_condition: UnlockCondition::Time { timestamp: unlock_time },
+        is_unlocked: false,
+    };
+    
+    LOCKS.save(deps.storage, (info.sender.clone(), lock_id), &lock)?;
+    CONFIG.save(deps.storage, &config)?;
+    
+    let current_total = TOTAL_LOCKED
+        .may_load(deps.storage, token_addr.clone())?
+        .unwrap_or_default();
+    let new_total = current_total.checked_add(amount)?;
+    TOTAL_LOCKED.save(deps.storage, token_addr.clone(), &new_total)?;
+    
+    let transfer_msg = WasmMsg::Execute {
+        contract_addr: token_addr.to_string(),
+        msg: to_json_binary(&Prc20ExecuteMsg::TransferFrom {
+            owner: info.sender.to_string(),
+            recipient: env.contract.address.to_string(),
+            amount,
+        })?,
+        funds: vec![],
+    };
+    
+    Ok(Response::new()
+        .add_message(transfer_msg)
+        .add_attribute("action", "lock_by_time")
+        .add_attribute("lock_id", lock_id.to_string())
+        .add_attribute("owner", info.sender)
+        .add_attribute("token", token_addr)
+        .add_attribute("amount", amount)
+        .add_attribute("unlock_time", unlock_time.to_string()))
+}
+
+fn execute_unlock(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
     lock_id: u64,
 ) -> Result<Response, ContractError> {
-    let lock_info = LOCKS
+    let mut lock = LOCKS
         .may_load(deps.storage, (info.sender.clone(), lock_id))?
         .ok_or(ContractError::LockNotFound {})?;
-
-    if lock_info.owner != info.sender {
-        return Err(ContractError::Unauthorized {});
-    }
-
-    if lock_info.is_unlocked {
+    
+    // Check ownership sudah implicit di LOCKS key (info.sender, lock_id)
+    
+    if lock.is_unlocked {
         return Err(ContractError::AlreadyUnlocked {});
     }
-
-    let can_unlock = if let Some(unlock_time) = lock_info.unlock_time {
-        env.block.time.seconds() >= unlock_time
-    } else if let Some(unlock_height) = lock_info.unlock_height {
-        env.block.height >= unlock_height
-    } else {
-        false
+    
+    let can_unlock = match lock.unlock_condition {
+        UnlockCondition::Height { height } => env.block.height >= height,
+        UnlockCondition::Time { timestamp } => env.block.time.seconds() >= timestamp,
     };
-
+    
     if !can_unlock {
-        return Err(ContractError::LockStillActive {});
+        return Err(ContractError::TokensStillLocked {});
     }
-
-    let mut updated_lock = lock_info.clone();
-    updated_lock.is_unlocked = true;
-    LOCKS.save(deps.storage, (info.sender.clone(), lock_id), &updated_lock)?;
-
-    let current_total = TOTAL_LOCKED
-        .load(deps.storage, lock_info.token_addr.clone())?;
-    let new_total = current_total.checked_sub(lock_info.amount).ok_or(ContractError::Overflow {})?;
-    TOTAL_LOCKED.save(deps.storage, lock_info.token_addr.clone(), &new_total)?;
-
+    
+    // Mark as unlocked BEFORE transfer untuk prevent reentrancy
+    lock.is_unlocked = true;
+    LOCKS.save(deps.storage, (info.sender.clone(), lock_id), &lock)?;
+    
+    // Update total locked dengan safe math
+    let current_total = TOTAL_LOCKED.load(deps.storage, lock.token_addr.clone())?;
+    let new_total = current_total.checked_sub(lock.amount)?;
+    TOTAL_LOCKED.save(deps.storage, lock.token_addr.clone(), &new_total)?;
+    
     let transfer_msg = WasmMsg::Execute {
-        contract_addr: lock_info.token_addr.to_string(),
-        msg: to_json_binary(&cw20::Cw20ExecuteMsg::Transfer {
+        contract_addr: lock.token_addr.to_string(),
+        msg: to_json_binary(&Prc20ExecuteMsg::Transfer {
             recipient: info.sender.to_string(),
-            amount: Uint128::from(lock_info.amount),
+            amount: lock.amount,
         })?,
         funds: vec![],
     };
-
+    
     Ok(Response::new()
-        .add_message(CosmosMsg::Wasm(transfer_msg))
-        .add_attribute("method", "unlock")
+        .add_message(transfer_msg)
+        .add_attribute("action", "unlock")
         .add_attribute("lock_id", lock_id.to_string())
         .add_attribute("owner", info.sender)
-        .add_attribute("amount", lock_info.amount.to_string()))
+        .add_attribute("amount", lock.amount))
 }
 
 #[entry_point]
 pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
-        QueryMsg::Config {} => to_json_binary(&query_config(deps)?),
-        QueryMsg::LockInfo { owner, lock_id } => to_json_binary(&query_lock_info(deps, owner, lock_id)?),
-        QueryMsg::TotalLocked { token_addr } => to_json_binary(&query_total_locked(deps, token_addr)?),
-        QueryMsg::AllLocks { owner } => to_json_binary(&query_all_locks(deps, owner)?),
+        QueryMsg::TotalLocked { token_addr } => {
+            to_json_binary(&query_total_locked(deps, token_addr)?)
+        }
+        QueryMsg::LockInfo { owner, lock_id } => {
+            to_json_binary(&query_lock_info(deps, owner, lock_id)?)
+        }
+        QueryMsg::AllLocks { owner } => {
+            to_json_binary(&query_all_locks(deps, owner)?)
+        }
     }
-}
-
-fn query_config(deps: Deps) -> StdResult<ConfigResponse> {
-    let config = CONFIG.load(deps.storage)?;
-    Ok(ConfigResponse { owner: config.owner })
-}
-
-fn query_lock_info(deps: Deps, owner: String, lock_id: u64) -> StdResult<LockInfoResponse> {
-    let owner_addr = deps.api.addr_validate(&owner)?;
-    let lock_info = LOCKS.load(deps.storage, (owner_addr, lock_id))?;
-
-    Ok(LockInfoResponse {
-        owner: lock_info.owner,
-        token_addr: lock_info.token_addr,
-        amount: lock_info.amount.to_string(),
-        unlock_time: lock_info.unlock_time,
-        unlock_height: lock_info.unlock_height,
-        is_unlocked: lock_info.is_unlocked,
-    })
 }
 
 fn query_total_locked(deps: Deps, token_addr: String) -> StdResult<TotalLockedResponse> {
     let token_addr = deps.api.addr_validate(&token_addr)?;
-    let total = TOTAL_LOCKED.may_load(deps.storage, token_addr.clone())?.unwrap_or(0);
-
+    let total_locked = TOTAL_LOCKED
+        .may_load(deps.storage, token_addr.clone())?
+        .unwrap_or_default();
     Ok(TotalLockedResponse {
-        token_addr,
-        total_amount: total.to_string(),
+        token_addr: token_addr.to_string(),
+        total_locked,
+    })
+}
+
+fn query_lock_info(deps: Deps, owner: String, lock_id: u64) -> StdResult<LockInfoResponse> {
+    let owner = deps.api.addr_validate(&owner)?;
+    let lock = LOCKS.load(deps.storage, (owner, lock_id))?;
+    Ok(LockInfoResponse {
+        lock: LockInfo {
+            lock_id: lock.lock_id,
+            owner: lock.owner,
+            token_addr: lock.token_addr,
+            amount: lock.amount,
+            unlock_condition: lock.unlock_condition,
+            is_unlocked: lock.is_unlocked,
+        },
     })
 }
 
 fn query_all_locks(deps: Deps, owner: String) -> StdResult<AllLocksResponse> {
-    let owner_addr = deps.api.addr_validate(&owner)?;
-    
-    let locks: Vec<(u64, LockInfoResponse)> = LOCKS
-        .prefix(owner_addr)
-        .range(deps.storage, None, None, cosmwasm_std::Order::Ascending)
-        .filter_map(|item| {
-            item.ok().map(|(lock_id, lock_info)| {
-                (
-                    lock_id,
-                    LockInfoResponse {
-                        owner: lock_info.owner,
-                        token_addr: lock_info.token_addr,
-                        amount: lock_info.amount.to_string(),
-                        unlock_time: lock_info.unlock_time,
-                        unlock_height: lock_info.unlock_height,
-                        is_unlocked: lock_info.is_unlocked,
-                    },
-                )
+    let owner = deps.api.addr_validate(&owner)?;
+    let locks: Vec<LockInfo> = LOCKS
+        .prefix(owner.clone())
+        .range(deps.storage, None, None, Order::Ascending)
+        .map(|item| {
+            let (_, lock) = item?;
+            Ok(LockInfo {
+                lock_id: lock.lock_id,
+                owner: lock.owner,
+                token_addr: lock.token_addr,
+                amount: lock.amount,
+                unlock_condition: lock.unlock_condition,
+                is_unlocked: lock.is_unlocked,
             })
         })
-        .collect();
-
+        .collect::<StdResult<Vec<_>>>()?;
     Ok(AllLocksResponse { locks })
 }
 
-mod cw20 {
-    use cosmwasm_std::Uint128;
-    use schemars::JsonSchema;
-    use serde::{Deserialize, Serialize};
-
-    #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-    #[serde(rename_all = "snake_case")]
-    pub enum Cw20ExecuteMsg {
-        Transfer { recipient: String, amount: Uint128 },
-        TransferFrom { owner: String, recipient: String, amount: Uint128 },
-    }
+#[cosmwasm_schema::cw_serde]
+enum Prc20ExecuteMsg {
+    Transfer { recipient: String, amount: Uint128 },
+    TransferFrom { owner: String, recipient: String, amount: Uint128 },
 }
 EOF
 
-cd ..
+cd ../..
 
-echo "✅ $PROJECT_NAME contract generated successfully!"
 echo ""
-echo "📁 Project structure:"
-echo "   $PROJECT_NAME/"
-echo "   ├── Cargo.toml (Edition 2021 + Fixed dependencies)"
-echo "   └── src/"
-echo "       ├── lib.rs"
-echo "       ├── contract.rs"
-echo "       ├── msg.rs"
-echo "       ├── state.rs"
-echo "       └── error.rs"
+echo -e "${GREEN}=========================================="
+echo "  ✓ LP Lock Contract Generated!"
+echo "==========================================${NC}"
 echo ""
-echo "🔧 Next steps:"
-echo "   1. Review generated files"
-echo "   2. Run: ./build_lp_lock.sh"
+echo -e "${CYAN}Files created:${NC}"
+echo "  contracts/prc20-lp-lock/src/contract.rs"
+echo "  contracts/prc20-lp-lock/src/msg.rs"
+echo "  contracts/prc20-lp-lock/src/state.rs"
+echo "  contracts/prc20-lp-lock/src/error.rs"
+echo "  contracts/prc20-lp-lock/src/lib.rs"
+echo "  contracts/prc20-lp-lock/Cargo.toml"
+echo ""
+echo -e "${YELLOW}Next step:${NC}"
+echo "  ./build_lp_lock.sh"
 echo ""
