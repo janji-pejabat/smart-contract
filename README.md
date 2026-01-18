@@ -21,17 +21,17 @@ Ada 2 cara:
 #### **CARA A: Via Raw GitHub (Recommended - Paling Cepat)** ⚡
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/YOUR_USERNAME/paxi-contracts/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/janji-pejabat/smart-contract/main/install.sh | bash
 ```
 
 #### **CARA B: Clone Repository Lengkap**
 
 ```bash
 # Clone repo
-git clone https://github.com/YOUR_USERNAME/paxi-contracts.git
+git clone https://github.com/janji-pejabat/smart-contract.git
 
 # Masuk folder
-cd paxi-contracts
+cd smart-contract
 
 # Jalankan installer
 chmod +x install_all.sh
@@ -50,7 +50,7 @@ Jika Anda yang bikin repository, ini langkah-langkahnya:
 # Di browser:
 # 1. Buka github.com
 # 2. Click "New Repository"
-# 3. Nama: paxi-contracts
+# 3. Nama: smart-contract
 # 4. Public/Private: Public
 # 5. Create Repository
 ```
@@ -58,7 +58,7 @@ Jika Anda yang bikin repository, ini langkah-langkahnya:
 ### **2. Upload Script ke GitHub**
 
 ```bash
-# Di Termux, dari folder paxi-contracts:
+# Di Termux, dari folder smart-contract:
 
 # Init git
 git init
@@ -70,7 +70,7 @@ git add .
 git commit -m "Initial commit - Paxi Smart Contracts Generator"
 
 # Connect ke GitHub
-git remote add origin https://github.com/YOUR_USERNAME/paxi-contracts.git
+git remote add origin https://github.com/janji-pejabat/smart-contract.git
 
 # Push
 git branch -M main
@@ -125,8 +125,8 @@ echo -e "${YELLOW}Installing Paxi Smart Contracts Generator...${NC}"
 echo ""
 
 # Configuration
-REPO_URL="https://github.com/YOUR_USERNAME/paxi-contracts"
-INSTALL_DIR="$HOME/paxi-contracts"
+REPO_URL="https://github.com/janji-pejabat/smart-contract"
+INSTALL_DIR="$HOME/smart-contract"
 
 # Check if already installed
 if [ -d "$INSTALL_DIR" ]; then
@@ -186,7 +186,7 @@ echo -e "${CYAN}Installation directory:${NC}"
 echo "  $INSTALL_DIR"
 echo ""
 echo -e "${CYAN}Next steps:${NC}"
-echo "  cd ~/paxi-contracts"
+echo "  cd ~/smart-contract"
 echo "  ./check_requirements.sh    # Check if all tools installed"
 echo "  ./generate_contracts_smart.sh    # Start building!"
 echo ""
@@ -221,7 +221,7 @@ git push
 Setelah di-upload ke GitHub, user tinggal jalankan:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/YOUR_USERNAME/paxi-contracts/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/janji-pejabat/smart-contract/main/install.sh | bash
 ```
 
 **SELESAI!** ✅
@@ -238,13 +238,13 @@ Buat file `README_INSTALL.md` untuk panduan user:
 ## 🚀 Quick Install (Termux)
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/YOUR_USERNAME/paxi-contracts/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/janji-pejabat/smart-contract/main/install.sh | bash
 ```
 
 ## ✅ After Installation
 
 ```bash
-cd ~/paxi-contracts
+cd ~/smart-contract
 ./check_requirements.sh
 ./generate_contracts_smart.sh
 ```
@@ -263,12 +263,12 @@ See [README.md](README.md) for complete guide.
 
 ## 🎯 **CONTOH REAL WORLD**
 
-Misal repository Anda: `github.com/paxi-dev/paxi-contracts`
+Misal repository Anda: `github.com/paxi-dev/smart-contract`
 
 User tinggal jalankan:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/paxi-dev/paxi-contracts/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/paxi-dev/smart-contract/main/install.sh | bash
 ```
 
 Boom! Otomatis:
@@ -287,7 +287,7 @@ Untuk user yang hati-hati:
 
 ```bash
 # Download dulu, baca scriptnya, baru jalankan
-curl -fsSL https://raw.githubusercontent.com/paxi-dev/paxi-contracts/main/install.sh -o install.sh
+curl -fsSL https://raw.githubusercontent.com/paxi-dev/smart-contract/main/install.sh -o install.sh
 
 # Baca isi script
 cat install.sh
@@ -318,7 +318,7 @@ Tambahkan di README.md utama:
 ## Quick Install
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/YOUR_USERNAME/paxi-contracts/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/janji-pejabat/smart-contract/main/install.sh | bash
 ```
 
 One command, everything ready! 🚀
