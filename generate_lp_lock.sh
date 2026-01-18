@@ -208,7 +208,7 @@ EOF
 cat > src/contract.rs << 'EOF'
 use cosmwasm_std::{
     entry_point, to_json_binary, Binary, Deps, DepsMut, Env, MessageInfo, 
-    Response, StdResult, Uint128, WasmMsg, Order, StdError
+    Response, StdResult, Uint128, WasmMsg, Order
 };
 use cw2::set_contract_version;
 use crate::error::ContractError;
