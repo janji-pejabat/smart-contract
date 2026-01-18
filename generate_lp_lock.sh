@@ -1,14 +1,16 @@
 #!/usr/bin/env bash
-# paxi network
+# paxi network - FIXED VERSION
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
+CYAN='\033[0;36m'
 NC='\033[0m'
 
 clear
 echo -e "${BLUE}=========================================="
 echo "  LP LOCK CONTRACT GENERATOR"
+echo "  Edition 2021 - Rust 1.83 Compatible"
 echo "==========================================${NC}"
 
 # Cek Rust
@@ -18,7 +20,7 @@ if ! command -v cargo &> /dev/null; then
     exit 1
 fi
 
-# Cek wasm target (Termux rust sudah include wasm32)
+# Cek wasm target
 if ! rustc --print target-list | grep -q "wasm32-unknown-unknown"; then
     echo -e "${RED}✗ wasm32-unknown-unknown tidak tersedia!${NC}"
     echo "Reinstall rust: pkg reinstall rust -y"
@@ -32,6 +34,7 @@ echo ""
 mkdir -p contracts/prc20-lp-lock/src
 cd contracts/prc20-lp-lock
 
+# FIXED Cargo.toml - Menggunakan versi yang stable dan compatible
 cat > Cargo.toml << 'EOF'
 [package]
 name = "prc20-lp-lock"
@@ -42,17 +45,16 @@ edition = "2021"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-cosmwasm-std = "2.1.0"
-cosmwasm-schema = "2.1.0"
-cw-storage-plus = "2.0.0"
-cw2 = "2.0.0"
+cosmwasm-std = "1.5.0"
+cosmwasm-schema = "1.5.0"
+cw-storage-plus = "1.2.0"
+cw2 = "1.1.0"
 schemars = "0.8"
 serde = { version = "1.0", default-features = false, features = ["derive"] }
-thiserror = "2.0"
-rmp = "=0.8.14"
+thiserror = "1.0"
 
 [dev-dependencies]
-cw-multi-test = "2.1.0"
+cw-multi-test = "0.20.0"
 EOF
 
 cat > src/lib.rs << 'EOF'
@@ -239,19 +241,16 @@ fn execute_lock_by_height(
     amount: Uint128,
     unlock_height: u64,
 ) -> Result<Response, ContractError> {
-    // Validasi amount
     if amount.is_zero() {
         return Err(ContractError::InvalidAmount {});
     }
     
-    // Validasi unlock_height harus di masa depan
     if unlock_height <= env.block.height {
         return Err(ContractError::InvalidUnlockHeight {});
     }
     
     let token_addr = deps.api.addr_validate(&token_addr)?;
     
-    // Increment lock counter dengan protection overflow
     let mut config = CONFIG.load(deps.storage)?;
     config.lock_counter = config.lock_counter.checked_add(1)
         .ok_or(ContractError::Std(cosmwasm_std::StdError::generic_err("Lock counter overflow")))?;
@@ -269,7 +268,6 @@ fn execute_lock_by_height(
     LOCKS.save(deps.storage, (info.sender.clone(), lock_id), &lock)?;
     CONFIG.save(deps.storage, &config)?;
     
-    // Update total locked dengan safe math
     let current_total = TOTAL_LOCKED
         .may_load(deps.storage, token_addr.clone())?
         .unwrap_or_default();
@@ -367,8 +365,6 @@ fn execute_unlock(
         .may_load(deps.storage, (info.sender.clone(), lock_id))?
         .ok_or(ContractError::LockNotFound {})?;
     
-    // Check ownership sudah implicit di LOCKS key (info.sender, lock_id)
-    
     if lock.is_unlocked {
         return Err(ContractError::AlreadyUnlocked {});
     }
@@ -382,11 +378,9 @@ fn execute_unlock(
         return Err(ContractError::TokensStillLocked {});
     }
     
-    // Mark as unlocked BEFORE transfer untuk prevent reentrancy
     lock.is_unlocked = true;
     LOCKS.save(deps.storage, (info.sender.clone(), lock_id), &lock)?;
     
-    // Update total locked dengan safe math
     let current_total = TOTAL_LOCKED.load(deps.storage, lock.token_addr.clone())?;
     let new_total = current_total.checked_sub(lock.amount)?;
     TOTAL_LOCKED.save(deps.storage, lock.token_addr.clone(), &new_total)?;
@@ -490,6 +484,11 @@ echo "  contracts/prc20-lp-lock/src/state.rs"
 echo "  contracts/prc20-lp-lock/src/error.rs"
 echo "  contracts/prc20-lp-lock/src/lib.rs"
 echo "  contracts/prc20-lp-lock/Cargo.toml"
+echo ""
+echo -e "${YELLOW}Dependency versions (Edition 2021 compatible):${NC}"
+echo "  cosmwasm-std: 1.5.0"
+echo "  cosmwasm-schema: 1.5.0"
+echo "  cw-storage-plus: 1.2.0"
 echo ""
 echo -e "${YELLOW}Next step:${NC}"
 echo "  ./build_lp_lock.sh"
