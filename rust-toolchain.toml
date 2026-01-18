@@ -3,7 +3,6 @@
 # Place this file in the root of your repository
 
 [toolchain]
-channel = "nightly"
+channel = "1.83.0"
 components = ["rustfmt", "clippy"]
 targets = ["wasm32-unknown-unknown"]
-profile = "minimal"
