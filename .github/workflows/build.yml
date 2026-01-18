@@ -1,0 +1,227 @@
+name: Build Paxi Contracts
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths:
+      - 'contracts/**'
+      - '.github/workflows/build.yml'
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+env:
+  RUST_VERSION: 1.81.0
+
+jobs:
+  build-lp-lock:
+    name: Build LP Lock Contract
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: ${{ env.RUST_VERSION }}
+          target: wasm32-unknown-unknown
+          override: true
+
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/registry
+          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Cache cargo index
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/git
+          key: ${{ runner.os }}-cargo-index-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Cache target directory
+        uses: actions/cache@v4
+        with:
+          path: contracts/prc20-lp-lock/target
+          key: ${{ runner.os }}-target-lp-lock-${{ hashFiles('contracts/prc20-lp-lock/Cargo.lock') }}
+
+      - name: Install wasm-opt
+        run: |
+          wget https://github.com/WebAssembly/binaryen/releases/download/version_116/binaryen-version_116-x86_64-linux.tar.gz
+          tar -xzf binaryen-version_116-x86_64-linux.tar.gz
+          sudo cp binaryen-version_116/bin/wasm-opt /usr/local/bin/
+          wasm-opt --version
+
+      - name: Build LP Lock contract
+        working-directory: contracts/prc20-lp-lock
+        run: |
+          cargo build --release --target wasm32-unknown-unknown
+          ls -lh target/wasm32-unknown-unknown/release/
+
+      - name: Optimize WASM
+        working-directory: contracts/prc20-lp-lock
+        run: |
+          wasm-opt -Oz \
+            target/wasm32-unknown-unknown/release/prc20_lp_lock.wasm \
+            -o prc20_lp_lock_optimized.wasm
+          ls -lh prc20_lp_lock_optimized.wasm
+
+      - name: Check contract size
+        working-directory: contracts/prc20-lp-lock
+        run: |
+          SIZE=$(wc -c < prc20_lp_lock_optimized.wasm)
+          echo "Contract size: $SIZE bytes"
+          if [ $SIZE -gt 524288 ]; then
+            echo "::warning::Contract size exceeds 512KB limit"
+          fi
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: prc20-lp-lock
+          path: contracts/prc20-lp-lock/prc20_lp_lock_optimized.wasm
+          retention-days: 30
+
+  build-vesting:
+    name: Build Vesting Contract
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: ${{ env.RUST_VERSION }}
+          target: wasm32-unknown-unknown
+          override: true
+
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/registry
+          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Cache cargo index
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/git
+          key: ${{ runner.os }}-cargo-index-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Cache target directory
+        uses: actions/cache@v4
+        with:
+          path: contracts/prc20-vesting/target
+          key: ${{ runner.os }}-target-vesting-${{ hashFiles('contracts/prc20-vesting/Cargo.lock') }}
+
+      - name: Install wasm-opt
+        run: |
+          wget https://github.com/WebAssembly/binaryen/releases/download/version_116/binaryen-version_116-x86_64-linux.tar.gz
+          tar -xzf binaryen-version_116-x86_64-linux.tar.gz
+          sudo cp binaryen-version_116/bin/wasm-opt /usr/local/bin/
+          wasm-opt --version
+
+      - name: Build Vesting contract
+        working-directory: contracts/prc20-vesting
+        run: |
+          cargo build --release --target wasm32-unknown-unknown
+          ls -lh target/wasm32-unknown-unknown/release/
+
+      - name: Optimize WASM
+        working-directory: contracts/prc20-vesting
+        run: |
+          wasm-opt -Oz \
+            target/wasm32-unknown-unknown/release/prc20_vesting.wasm \
+            -o prc20_vesting_optimized.wasm
+          ls -lh prc20_vesting_optimized.wasm
+
+      - name: Check contract size
+        working-directory: contracts/prc20-vesting
+        run: |
+          SIZE=$(wc -c < prc20_vesting_optimized.wasm)
+          echo "Contract size: $SIZE bytes"
+          if [ $SIZE -gt 524288 ]; then
+            echo "::warning::Contract size exceeds 512KB limit"
+          fi
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: prc20-vesting
+          path: contracts/prc20-vesting/prc20_vesting_optimized.wasm
+          retention-days: 30
+
+  create-release:
+    name: Create Release
+    needs: [build-lp-lock, build-vesting]
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download LP Lock artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: prc20-lp-lock
+          path: artifacts/
+
+      - name: Download Vesting artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: prc20-vesting
+          path: artifacts/
+
+      - name: Generate checksums
+        working-directory: artifacts
+        run: |
+          sha256sum prc20_lp_lock_optimized.wasm > checksums.txt
+          sha256sum prc20_vesting_optimized.wasm >> checksums.txt
+          cat checksums.txt
+
+      - name: Get version
+        id: version
+        run: echo "VERSION=v$(date +'%Y%m%d-%H%M%S')" >> $GITHUB_OUTPUT
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ steps.version.outputs.VERSION }}
+          name: Release ${{ steps.version.outputs.VERSION }}
+          body: |
+            ## Paxi Smart Contracts Build
+            
+            **Build Date:** $(date +'%Y-%m-%d %H:%M:%S UTC')
+            **Commit:** ${{ github.sha }}
+            
+            ### Contracts Included:
+            - ✅ LP Lock Contract (`prc20_lp_lock_optimized.wasm`)
+            - ✅ Vesting Contract (`prc20_vesting_optimized.wasm`)
+            
+            ### Checksums:
+            See `checksums.txt` for SHA256 hashes.
+            
+            ### Deployment:
+            ```bash
+            # Download contracts
+            wget https://github.com/${{ github.repository }}/releases/download/${{ steps.version.outputs.VERSION }}/prc20_lp_lock_optimized.wasm
+            wget https://github.com/${{ github.repository }}/releases/download/${{ steps.version.outputs.VERSION }}/prc20_vesting_optimized.wasm
+            
+            # Verify checksums
+            wget https://github.com/${{ github.repository }}/releases/download/${{ steps.version.outputs.VERSION }}/checksums.txt
+            sha256sum -c checksums.txt
+            
+            # Deploy to Paxi
+            paxid tx wasm store prc20_lp_lock_optimized.wasm --from wallet-name --gas 3000000 --fees 15000upaxi --chain-id paxi-testnet-1
+            ```
+          files: |
+            artifacts/prc20_lp_lock_optimized.wasm
+            artifacts/prc20_vesting_optimized.wasm
+            artifacts/checksums.txt
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
