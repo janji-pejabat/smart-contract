@@ -27,8 +27,8 @@ fi
 echo -e "${GREEN}✓ Requirements OK${NC}"
 echo ""
 
-mkdir -p prc20-vesting/src
-cd prc20-vesting
+mkdir -p contracts/prc20-vesting/src
+cd contracts/prc20-vesting
 
 cat > Cargo.toml << 'EOF'
 [package]
@@ -522,7 +522,7 @@ enum Prc20ExecuteMsg {
 }
 EOF
 
-cd ..
+cd ../..
 
 echo ""
 echo -e "${GREEN}=========================================="
@@ -530,12 +530,12 @@ echo "  ✓ Vesting Contract Generated!"
 echo "==========================================${NC}"
 echo ""
 echo -e "${CYAN}Files created:${NC}"
-echo "  prc20-vesting/src/contract.rs"
-echo "  prc20-vesting/src/msg.rs"
-echo "  prc20-vesting/src/state.rs"
-echo "  prc20-vesting/src/error.rs"
-echo "  prc20-vesting/src/lib.rs"
-echo "  prc20-vesting/Cargo.toml"
+echo "  contracts/prc20-vesting/src/contract.rs"
+echo "  contracts/prc20-vesting/src/msg.rs"
+echo "  contracts/prc20-vesting/src/state.rs"
+echo "  contracts/prc20-vesting/src/error.rs"
+echo "  contracts/prc20-vesting/src/lib.rs"
+echo "  contracts/prc20-vesting/Cargo.toml"
 echo ""
 echo -e "${YELLOW}Next step:${NC}"
 echo "  ./build_vesting.sh"

@@ -29,8 +29,8 @@ echo -e "${GREEN}✓ Requirements OK${NC}"
 echo ""
 
 # Create project
-mkdir -p prc20-lp-lock/src
-cd prc20-lp-lock
+mkdir -p contracts/prc20-lp-lock/src
+cd contracts/prc20-lp-lock
 
 cat > Cargo.toml << 'EOF'
 [package]
@@ -475,7 +475,7 @@ enum Prc20ExecuteMsg {
 }
 EOF
 
-cd ..
+cd ../..
 
 echo ""
 echo -e "${GREEN}=========================================="
@@ -483,12 +483,12 @@ echo "  ✓ LP Lock Contract Generated!"
 echo "==========================================${NC}"
 echo ""
 echo -e "${CYAN}Files created:${NC}"
-echo "  prc20-lp-lock/src/contract.rs"
-echo "  prc20-lp-lock/src/msg.rs"
-echo "  prc20-lp-lock/src/state.rs"
-echo "  prc20-lp-lock/src/error.rs"
-echo "  prc20-lp-lock/src/lib.rs"
-echo "  prc20-lp-lock/Cargo.toml"
+echo "  contracts/prc20-lp-lock/src/contract.rs"
+echo "  contracts/prc20-lp-lock/src/msg.rs"
+echo "  contracts/prc20-lp-lock/src/state.rs"
+echo "  contracts/prc20-lp-lock/src/error.rs"
+echo "  contracts/prc20-lp-lock/src/lib.rs"
+echo "  contracts/prc20-lp-lock/Cargo.toml"
 echo ""
 echo -e "${YELLOW}Next step:${NC}"
 echo "  ./build_lp_lock.sh"

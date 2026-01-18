@@ -12,13 +12,13 @@ echo "==========================================${NC}"
 echo ""
 
 # Cek folder contract ada
-if [ ! -d "prc20-lp-lock" ]; then
-    echo -e "${RED}✗ prc20-lp-lock folder not found!${NC}"
+if [ ! -d "contracts/prc20-lp-lock" ]; then
+    echo -e "${RED}✗ contracts/prc20-lp-lock folder not found!${NC}"
     echo "Run ./generate_lp_lock.sh first"
     exit 1
 fi
 
-cd prc20-lp-lock
+cd contracts/prc20-lp-lock
 
 echo -e "${YELLOW}[1/3] Compiling to WASM...${NC}"
 cargo build --release --target wasm32-unknown-unknown
@@ -68,7 +68,7 @@ echo ""
 echo -e "${YELLOW}[3/3] Copying to artifacts...${NC}"
 cd ..
 mkdir -p artifacts
-cp prc20-lp-lock/prc20_lp_lock_optimized.wasm artifacts/
+cp contracts/prc20-lp-lock/prc20_lp_lock_optimized.wasm artifacts/
 
 echo -e "${GREEN}✓ Build complete!${NC}"
 echo -e "${GREEN}→ artifacts/prc20_lp_lock_optimized.wasm (${SIZE_AFTER})${NC}"
@@ -78,7 +78,7 @@ echo ""
 read -p "Clean build cache to save storage? [y/n]: " CLEAN_CACHE
 if [ "$CLEAN_CACHE" = "y" ] || [ "$CLEAN_CACHE" = "Y" ]; then
     echo -e "${YELLOW}Cleaning cache...${NC}"
-    cd prc20-lp-lock
+    cd contracts/prc20-lp-lock
     cargo clean
     cd ..
     echo -e "${GREEN}✓ Cache cleaned! (~200MB freed)${NC}"
