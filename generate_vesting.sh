@@ -1,5 +1,7 @@
-# generate_vesting.sh - FIXED FULL
 #!/usr/bin/env bash
+# generate_vesting.sh - FULLY FIXED VERSION
+# Fixes: edition2024 -> edition2021, removed base64ct patch, overflow handling, syntax error in revoke function
+
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
@@ -8,8 +10,8 @@ NC='\033[0m'
 
 clear
 echo -e "${BLUE}=========================================="
-echo "  VESTING CONTRACT GENERATOR"
-echo "  Edition 2021 - Cargo 1.83 Compatible"
+echo "  VESTING CONTRACT GENERATOR (FIXED)"
+echo "  Edition 2021 - Stable & Compatible"
 echo "==========================================${NC}"
 
 if ! command -v cargo &> /dev/null; then
@@ -20,6 +22,7 @@ fi
 mkdir -p contracts/prc20-vesting/src
 cd contracts/prc20-vesting
 
+# FIXED Cargo.toml - removed base64ct patch, edition 2021
 cat > Cargo.toml << 'EOF'
 [package]
 name = "prc20-vesting"
@@ -41,8 +44,16 @@ thiserror = "1.0.50"
 [dev-dependencies]
 cw-multi-test = "0.20.0"
 
-[patch.crates-io]
-base64ct = { version = "=1.6.0" }
+[profile.release]
+opt-level = 3
+debug = false
+rpath = false
+lto = true
+debug-assertions = false
+codegen-units = 1
+panic = 'abort'
+incremental = false
+overflow-checks = true
 EOF
 
 cat > src/lib.rs << 'EOF'
@@ -157,31 +168,44 @@ use thiserror::Error;
 pub enum ContractError {
     #[error("{0}")]
     Std(#[from] StdError),
+    
     #[error("Unauthorized")]
     Unauthorized {},
+    
     #[error("Vesting not found")]
     VestingNotFound {},
+    
     #[error("Vesting already exists")]
     VestingAlreadyExists {},
+    
     #[error("Invalid cliff time")]
     InvalidCliffTime {},
+    
     #[error("Invalid vesting duration")]
     InvalidVestingDuration {},
+    
     #[error("Amount must be greater than zero")]
     InvalidAmount {},
+    
     #[error("No tokens to claim")]
     NoTokensToClaim {},
+    
     #[error("Cliff not ended")]
     CliffNotEnded {},
+    
     #[error("Vesting revoked")]
     VestingRevoked {},
+    
+    #[error("Overflow error")]
+    Overflow {},
 }
 EOF
 
+# FIXED contract.rs - proper overflow handling and fixed syntax error in revoke function
 cat > src/contract.rs << 'EOF'
 use cosmwasm_std::{
     entry_point, to_json_binary, Binary, Deps, DepsMut, Env, MessageInfo, 
-    Response, StdResult, Uint128, WasmMsg, Order
+    Response, StdResult, Uint128, WasmMsg, Order, StdError
 };
 use cw2::set_contract_version;
 use crate::error::ContractError;
@@ -272,10 +296,12 @@ fn execute_create_vesting(
         return Err(ContractError::VestingAlreadyExists {});
     }
     
-    let cliff_time = start_time.checked_add(cliff_duration)
-        .ok_or(ContractError::Std(cosmwasm_std::StdError::generic_err("Cliff time overflow")))?;
-    let end_time = start_time.checked_add(vesting_duration)
-        .ok_or(ContractError::Std(cosmwasm_std::StdError::generic_err("End time overflow")))?;
+    let cliff_time = start_time
+        .checked_add(cliff_duration)
+        .ok_or(ContractError::Overflow {})?;
+    let end_time = start_time
+        .checked_add(vesting_duration)
+        .ok_or(ContractError::Overflow {})?;
     
     if cliff_time > end_time {
         return Err(ContractError::InvalidCliffTime {});
@@ -330,13 +356,17 @@ fn execute_claim(
     }
     
     let vested_amount = calculate_vested_amount(&vesting, current_time);
-    let claimable = vested_amount.checked_sub(vesting.claimed_amount)?;
+    let claimable = vested_amount
+        .checked_sub(vesting.claimed_amount)
+        .map_err(|_| ContractError::Overflow {})?;
     
     if claimable.is_zero() {
         return Err(ContractError::NoTokensToClaim {});
     }
     
-    vesting.claimed_amount = vesting.claimed_amount.checked_add(claimable)?;
+    vesting.claimed_amount = vesting.claimed_amount
+        .checked_add(claimable)
+        .map_err(|_| ContractError::Overflow {})?;
     VESTING_SCHEDULES.save(deps.storage, info.sender.clone(), &vesting)?;
     
     let config = CONFIG.load(deps.storage)?;
@@ -374,10 +404,13 @@ fn execute_revoke_vesting(
     
     if vesting.revoked {
         return Err(ContractError::VestingRevoked {});
-        ```bash
+    }
+    
     let current_time = env.block.time.seconds();
     let vested_amount = calculate_vested_amount(&vesting, current_time);
-    let unvested = vesting.total_amount.checked_sub(vested_amount)?;
+    let unvested = vesting.total_amount
+        .checked_sub(vested_amount)
+        .map_err(|_| ContractError::Overflow {})?;
     
     vesting.revoked = true;
     VESTING_SCHEDULES.save(deps.storage, beneficiary_addr.clone(), &vesting)?;
@@ -509,5 +542,11 @@ EOF
 cd ../..
 
 echo ""
-echo -e "${GREEN}✓ Vesting Contract Generated!${NC}"
+echo -e "${GREEN}✓ Vesting Contract Generated! (FIXED)${NC}"
+echo -e "${CYAN}Fixes Applied:${NC}"
+echo -e "  • Edition 2021 (stable)"
+echo -e "  • Removed base64ct patch"
+echo -e "  • Proper overflow handling"
+echo -e "  • Fixed syntax error in revoke function"
+echo ""
 echo -e "${YELLOW}Next: ./build_vesting.sh${NC}"

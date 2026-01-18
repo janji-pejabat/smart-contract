@@ -1,5 +1,7 @@
-# generate_lp_lock.sh - FIXED FULL
 #!/usr/bin/env bash
+# generate_lp_lock.sh - FULLY FIXED VERSION
+# Fixes: edition2024 -> edition2021, removed base64ct patch, overflow handling
+
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
@@ -9,8 +11,8 @@ NC='\033[0m'
 
 clear
 echo -e "${BLUE}=========================================="
-echo "  LP LOCK CONTRACT GENERATOR"
-echo "  Edition 2021 - Cargo 1.83 Compatible"
+echo "  LP LOCK CONTRACT GENERATOR (FIXED)"
+echo "  Edition 2021 - Stable & Compatible"
 echo "==========================================${NC}"
 
 if ! command -v cargo &> /dev/null; then
@@ -31,6 +33,7 @@ echo ""
 mkdir -p contracts/prc20-lp-lock/src
 cd contracts/prc20-lp-lock
 
+# FIXED Cargo.toml - removed base64ct patch, edition 2021
 cat > Cargo.toml << 'EOF'
 [package]
 name = "prc20-lp-lock"
@@ -52,8 +55,16 @@ thiserror = "1.0.50"
 [dev-dependencies]
 cw-multi-test = "0.20.0"
 
-[patch.crates-io]
-base64ct = { version = "=1.6.0" }
+[profile.release]
+opt-level = 3
+debug = false
+rpath = false
+lto = true
+debug-assertions = false
+codegen-units = 1
+panic = 'abort'
+incremental = false
+overflow-checks = true
 EOF
 
 cat > src/lib.rs << 'EOF'
@@ -166,27 +177,38 @@ use thiserror::Error;
 pub enum ContractError {
     #[error("{0}")]
     Std(#[from] StdError),
+    
     #[error("Unauthorized")]
     Unauthorized {},
+    
     #[error("Lock not found")]
     LockNotFound {},
+    
     #[error("Tokens still locked")]
     TokensStillLocked {},
+    
     #[error("Already unlocked")]
     AlreadyUnlocked {},
+    
     #[error("Invalid unlock height")]
     InvalidUnlockHeight {},
+    
     #[error("Invalid unlock time")]
     InvalidUnlockTime {},
+    
     #[error("Amount must be greater than zero")]
     InvalidAmount {},
+    
+    #[error("Overflow error")]
+    Overflow {},
 }
 EOF
 
+# FIXED contract.rs - proper overflow handling
 cat > src/contract.rs << 'EOF'
 use cosmwasm_std::{
     entry_point, to_json_binary, Binary, Deps, DepsMut, Env, MessageInfo, 
-    Response, StdResult, Uint128, WasmMsg, Order
+    Response, StdResult, Uint128, WasmMsg, Order, StdError
 };
 use cw2::set_contract_version;
 use crate::error::ContractError;
@@ -251,8 +273,9 @@ fn execute_lock_by_height(
     let token_addr = deps.api.addr_validate(&token_addr)?;
     
     let mut config = CONFIG.load(deps.storage)?;
-    config.lock_counter = config.lock_counter.checked_add(1)
-        .ok_or(ContractError::Std(cosmwasm_std::StdError::generic_err("Lock counter overflow")))?;
+    config.lock_counter = config.lock_counter
+        .checked_add(1)
+        .ok_or(ContractError::Overflow {})?;
     let lock_id = config.lock_counter;
     
     let lock = Lock {
@@ -270,7 +293,8 @@ fn execute_lock_by_height(
     let current_total = TOTAL_LOCKED
         .may_load(deps.storage, token_addr.clone())?
         .unwrap_or_default();
-    let new_total = current_total.checked_add(amount)?;
+    let new_total = current_total.checked_add(amount)
+        .map_err(|_| ContractError::Overflow {})?;
     TOTAL_LOCKED.save(deps.storage, token_addr.clone(), &new_total)?;
     
     let transfer_msg = WasmMsg::Execute {
@@ -312,8 +336,9 @@ fn execute_lock_by_time(
     let token_addr = deps.api.addr_validate(&token_addr)?;
     
     let mut config = CONFIG.load(deps.storage)?;
-    config.lock_counter = config.lock_counter.checked_add(1)
-        .ok_or(ContractError::Std(cosmwasm_std::StdError::generic_err("Lock counter overflow")))?;
+    config.lock_counter = config.lock_counter
+        .checked_add(1)
+        .ok_or(ContractError::Overflow {})?;
     let lock_id = config.lock_counter;
     
     let lock = Lock {
@@ -331,7 +356,8 @@ fn execute_lock_by_time(
     let current_total = TOTAL_LOCKED
         .may_load(deps.storage, token_addr.clone())?
         .unwrap_or_default();
-    let new_total = current_total.checked_add(amount)?;
+    let new_total = current_total.checked_add(amount)
+        .map_err(|_| ContractError::Overflow {})?;
     TOTAL_LOCKED.save(deps.storage, token_addr.clone(), &new_total)?;
     
     let transfer_msg = WasmMsg::Execute {
@@ -381,7 +407,8 @@ fn execute_unlock(
     LOCKS.save(deps.storage, (info.sender.clone(), lock_id), &lock)?;
     
     let current_total = TOTAL_LOCKED.load(deps.storage, lock.token_addr.clone())?;
-    let new_total = current_total.checked_sub(lock.amount)?;
+    let new_total = current_total.checked_sub(lock.amount)
+        .map_err(|_| ContractError::Overflow {})?;
     TOTAL_LOCKED.save(deps.storage, lock.token_addr.clone(), &new_total)?;
     
     let transfer_msg = WasmMsg::Execute {
@@ -472,5 +499,10 @@ EOF
 cd ../..
 
 echo ""
-echo -e "${GREEN}✓ LP Lock Contract Generated!${NC}"
+echo -e "${GREEN}✓ LP Lock Contract Generated! (FIXED)${NC}"
+echo -e "${CYAN}Fixes Applied:${NC}"
+echo -e "  • Edition 2021 (stable)"
+echo -e "  • Removed base64ct patch"
+echo -e "  • Proper overflow handling"
+echo ""
 echo -e "${YELLOW}Next: ./build_lp_lock.sh${NC}"

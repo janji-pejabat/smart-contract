@@ -1,91 +1,74 @@
 #!/usr/bin/env bash
-# paxi network
+# build_lp_lock.sh - Build script for LP Lock contract
+
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+CYAN='\033[0;36m'
 NC='\033[0m'
 
 clear
-echo -e "${YELLOW}=========================================="
-echo "  Building LP Lock Contract"
+echo -e "${BLUE}=========================================="
+echo "  LP LOCK CONTRACT BUILD"
 echo "==========================================${NC}"
-echo ""
 
-# Cek folder contract ada
 if [ ! -d "contracts/prc20-lp-lock" ]; then
-    echo -e "${RED}✗ contracts/prc20-lp-lock folder not found!${NC}"
+    echo -e "${RED}✗ Contract folder not found!${NC}"
     echo "Run ./generate_lp_lock.sh first"
     exit 1
 fi
 
+if ! command -v cargo &> /dev/null; then
+    echo -e "${RED}✗ Rust tidak ditemukan!${NC}"
+    exit 1
+fi
+
+if ! command -v wasm-opt &> /dev/null; then
+    echo -e "${RED}✗ wasm-opt tidak ditemukan!${NC}"
+    echo "Install: pkg install binaryen -y"
+    exit 1
+fi
+
+echo -e "${GREEN}✓ Build tools OK${NC}"
+echo ""
+
 cd contracts/prc20-lp-lock
 
-echo -e "${YELLOW}[1/3] Compiling to WASM...${NC}"
-cargo build --release --target wasm32-unknown-unknown
+echo -e "${CYAN}[1/3] Compiling to WASM...${NC}"
+RUSTFLAGS='-C link-arg=-s' cargo build --release --target wasm32-unknown-unknown
 
 if [ $? -ne 0 ]; then
-    echo -e "${RED}✗ Build failed${NC}"
-    cd ..
+    echo -e "${RED}✗ Compilation failed!${NC}"
     exit 1
 fi
 
-echo -e "${GREEN}✓ Compile successful${NC}"
-
-# Check wasm-opt
-if ! command -v wasm-opt &> /dev/null; then
-    echo -e "${RED}✗ wasm-opt not found${NC}"
-    echo "Install: pkg install binaryen -y"
-    cd ..
-    exit 1
-fi
-
-WASM_FILE="target/wasm32-unknown-unknown/release/prc20_lp_lock.wasm"
-if [ ! -f "$WASM_FILE" ]; then
-    echo -e "${RED}✗ WASM file not found: ${WASM_FILE}${NC}"
-    cd ..
-    exit 1
-fi
-
-SIZE_BEFORE=$(du -h "$WASM_FILE" | cut -f1)
-echo -e "${YELLOW}Size before optimize: ${SIZE_BEFORE}${NC}"
 echo ""
-
-echo -e "${YELLOW}[2/3] Optimizing with wasm-opt...${NC}"
-wasm-opt -Oz \
-    target/wasm32-unknown-unknown/release/prc20_lp_lock.wasm \
-    -o prc20_lp_lock_optimized.wasm
+echo -e "${CYAN}[2/3] Optimizing with wasm-opt...${NC}"
+wasm-opt -Os --signext-lowering target/wasm32-unknown-unknown/release/prc20_lp_lock.wasm \
+    -o target/wasm32-unknown-unknown/release/prc20_lp_lock_optimized.wasm
 
 if [ $? -ne 0 ]; then
-    echo -e "${RED}✗ Optimization failed${NC}"
-    cd ..
+    echo -e "${RED}✗ Optimization failed!${NC}"
     exit 1
 fi
 
-SIZE_AFTER=$(du -h prc20_lp_lock_optimized.wasm | cut -f1)
-echo -e "${GREEN}✓ Optimized! Size: ${SIZE_AFTER}${NC}"
 echo ""
+echo -e "${CYAN}[3/3] Creating artifacts...${NC}"
+mkdir -p ../../artifacts
+cp target/wasm32-unknown-unknown/release/prc20_lp_lock_optimized.wasm \
+    ../../artifacts/
 
-echo -e "${YELLOW}[3/3] Copying to artifacts...${NC}"
-cd ..
-mkdir -p artifacts
-cp contracts/prc20-lp-lock/prc20_lp_lock_optimized.wasm artifacts/
+cd ../..
 
-echo -e "${GREEN}✓ Build complete!${NC}"
-echo -e "${GREEN}→ artifacts/prc20_lp_lock_optimized.wasm (${SIZE_AFTER})${NC}"
-echo ""
-
-# Ask to clean cache
-read -p "Clean build cache to save storage? [y/n]: " CLEAN_CACHE
-if [ "$CLEAN_CACHE" = "y" ] || [ "$CLEAN_CACHE" = "Y" ]; then
-    echo -e "${YELLOW}Cleaning cache...${NC}"
-    cd prc20-lp-lock
-    cargo clean
-    cd ..
-    echo -e "${GREEN}✓ Cache cleaned! (~200MB freed)${NC}"
-fi
+SIZE=$(du -h artifacts/prc20_lp_lock_optimized.wasm | cut -f1)
 
 echo ""
-echo -e "${BLUE}=========================================="
-echo "  Ready to deploy!"
+echo -e "${GREEN}=========================================="
+echo "  ✓ BUILD SUCCESS!"
 echo "==========================================${NC}"
+echo -e "Contract: ${CYAN}prc20_lp_lock_optimized.wasm${NC}"
+echo -e "Location: ${CYAN}artifacts/${NC}"
+echo -e "Size:     ${CYAN}${SIZE}${NC}"
 echo ""
+echo -e "${YELLOW}Ready to deploy!${NC}"
