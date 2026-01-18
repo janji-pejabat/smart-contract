@@ -50,6 +50,9 @@ schemars = "0.8"
 serde = { version = "1.0", default-features = false, features = ["derive"] }
 thiserror = "2.0"
 
+[patch.crates-io]
+rmp = "=0.8.14"
+
 [dev-dependencies]
 cw-multi-test = "2.2.0"
 EOF
