@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# generate_lp_lock.sh - FULLY FIXED VERSION
-# Fixes: edition2024 -> edition2021, removed base64ct patch, overflow handling
+# generate_lp_lock.sh - FULLY FIXED VERSION v2
+# Fixes: Pin base64ct to 1.6.0 to avoid edition2024 dependency
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -11,8 +11,8 @@ NC='\033[0m'
 
 clear
 echo -e "${BLUE}=========================================="
-echo "  LP LOCK CONTRACT GENERATOR (FIXED)"
-echo "  Edition 2021 - Stable & Compatible"
+echo "  LP LOCK CONTRACT GENERATOR (FIXED v2)"
+echo "  Edition 2021 + base64ct 1.6.0"
 echo "==========================================${NC}"
 
 if ! command -v cargo &> /dev/null; then
@@ -33,7 +33,7 @@ echo ""
 mkdir -p contracts/prc20-lp-lock/src
 cd contracts/prc20-lp-lock
 
-# FIXED Cargo.toml - removed base64ct patch, edition 2021
+# FIXED Cargo.toml - pin base64ct to 1.6.0 to avoid edition2024
 cat > Cargo.toml << 'EOF'
 [package]
 name = "prc20-lp-lock"
@@ -51,6 +51,7 @@ cw2 = "1.1.0"
 schemars = "0.8.16"
 serde = { version = "1.0.193", default-features = false, features = ["derive"] }
 thiserror = "1.0.50"
+base64ct = "=1.6.0"
 
 [dev-dependencies]
 cw-multi-test = "0.20.0"
@@ -204,7 +205,6 @@ pub enum ContractError {
 }
 EOF
 
-# FIXED contract.rs - proper overflow handling
 cat > src/contract.rs << 'EOF'
 use cosmwasm_std::{
     entry_point, to_json_binary, Binary, Deps, DepsMut, Env, MessageInfo, 
@@ -499,10 +499,10 @@ EOF
 cd ../..
 
 echo ""
-echo -e "${GREEN}✓ LP Lock Contract Generated! (FIXED)${NC}"
+echo -e "${GREEN}✓ LP Lock Contract Generated! (FIXED v2)${NC}"
 echo -e "${CYAN}Fixes Applied:${NC}"
 echo -e "  • Edition 2021 (stable)"
-echo -e "  • Removed base64ct patch"
+echo -e "  • base64ct pinned to 1.6.0"
 echo -e "  • Proper overflow handling"
 echo ""
 echo -e "${YELLOW}Next: ./build_lp_lock.sh${NC}"
