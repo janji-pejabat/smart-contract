@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# build_lp_lock_secure.sh - Build secure version
+# build_lp_lock.sh - Build secure version
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -18,7 +18,7 @@ PROJECT_DIR="contracts/prc20-lp-lock"
 
 if [ ! -d "$PROJECT_DIR" ]; then
     echo -e "${RED}✗ Contract folder not found!${NC}"
-    echo -e "${YELLOW}Run ./generate_lp_lock_secure.sh first${NC}"
+    echo -e "${YELLOW}Run ./generate_lp_lock.sh first${NC}"
     exit 1
 fi
 
@@ -61,17 +61,17 @@ if [ -z "$SKIP_OPT" ]; then
     echo ""
     echo -e "${CYAN}[3/4] Optimizing with wasm-opt...${NC}"
     wasm-opt -Oz --enable-sign-ext \
-        target/wasm32-unknown-unknown/release/prc20_lp_lock_secure.wasm \
-        -o target/wasm32-unknown-unknown/release/prc20_lp_lock_secure_optimized.wasm
+        target/wasm32-unknown-unknown/release/prc20_lp_lock.wasm \
+        -o target/wasm32-unknown-unknown/release/prc20_lp_lock_optimized.wasm
 
     if [ $? -ne 0 ]; then
         echo -e "${RED}✗ Optimization failed!${NC}"
         exit 1
     fi
-    FINAL_WASM="prc20_lp_lock_secure_optimized.wasm"
+    FINAL_WASM="prc20_lp_lock_optimized.wasm"
 else
     echo -e "${YELLOW}[3/4] Skipping optimization${NC}"
-    FINAL_WASM="prc20_lp_lock_secure.wasm"
+    FINAL_WASM="prc20_lp_lock.wasm"
 fi
 
 echo ""

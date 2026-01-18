@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# generate_lp_lock_secure.sh - PRODUCTION READY VERSION
+# generate_lp_lock.sh - PRODUCTION READY VERSION
 # Fixes ALL critical security issues + Paxi integration
 
 RED='\033[0;31m'
@@ -353,7 +353,7 @@ use crate::state::{
     Config, Lock, ReentrancyGuard, APPROVED_LP_TOKENS, CONFIG, LOCKS, REENTRANCY_GUARD,
 };
 
-const CONTRACT_NAME: &str = "paxi:lp-lock-secure";
+const CONTRACT_NAME: &str = "paxi:lp-lock";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 #[entry_point]
