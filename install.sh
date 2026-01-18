@@ -14,6 +14,23 @@ echo "  Resource-Efficient Mode for Termux"
 echo "==========================================${NC}"
 echo ""
 
+# Cek Rust installation
+if ! command -v cargo &> /dev/null; then
+    echo -e "${RED}✗ Rust/Cargo tidak ditemukan!${NC}"
+    echo "Install dulu dengan:"
+    echo "  pkg install rust -y"
+    exit 1
+fi
+
+# Cek wasm target (dari pkg rust, sudah include)
+if ! rustc --print target-list | grep -q "wasm32-unknown-unknown"; then
+    echo -e "${RED}✗ wasm32-unknown-unknown target tidak tersedia!${NC}"
+    echo "Reinstall rust: pkg reinstall rust -y"
+    exit 1
+fi
+
+echo -e "${GREEN}✓ Rust & WASM target OK!${NC}"
+
 echo -e "${CYAN}Pilih contract yang ingin di-generate:${NC}"
 echo ""
 echo "  1) LP Lock saja (recommended untuk mulai)"
