@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# paxi network - FIXED VERSION
+# paxi network - FIXED VERSION with pinned dependencies
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
@@ -11,6 +11,7 @@ clear
 echo -e "${BLUE}=========================================="
 echo "  LP LOCK CONTRACT GENERATOR"
 echo "  Edition 2021 - Rust 1.83 Compatible"
+echo "  FIXED: Pinned dependencies"
 echo "==========================================${NC}"
 
 # Cek Rust
@@ -34,7 +35,7 @@ echo ""
 mkdir -p contracts/prc20-lp-lock/src
 cd contracts/prc20-lp-lock
 
-# FIXED Cargo.toml - Menggunakan versi yang stable dan compatible
+# FIXED Cargo.toml - PIN ALL VERSIONS + PATCH rmp-serde
 cat > Cargo.toml << 'EOF'
 [package]
 name = "prc20-lp-lock"
@@ -45,16 +46,20 @@ edition = "2021"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-cosmwasm-std = "1.5.0"
-cosmwasm-schema = "1.5.0"
-cw-storage-plus = "1.2.0"
-cw2 = "1.1.0"
-schemars = "0.8"
-serde = { version = "1.0", default-features = false, features = ["derive"] }
-thiserror = "1.0"
+cosmwasm-std = "=1.5.0"
+cosmwasm-schema = "=1.5.0"
+cw-storage-plus = "=1.2.0"
+cw2 = "=1.1.0"
+schemars = "=0.8.16"
+serde = { version = "=1.0.210", default-features = false, features = ["derive"] }
+thiserror = "=1.0.50"
 
 [dev-dependencies]
-cw-multi-test = "0.20.0"
+cw-multi-test = "=0.20.0"
+
+# CRITICAL FIX: Force downgrade rmp-serde to avoid edition2024 requirement
+[patch.crates-io]
+rmp-serde = { version = "=1.3.0" }
 EOF
 
 cat > src/lib.rs << 'EOF'
@@ -475,6 +480,7 @@ cd ../..
 echo ""
 echo -e "${GREEN}=========================================="
 echo "  ✓ LP Lock Contract Generated!"
+echo "  ✓ Dependencies PINNED (edition2024 fix)"
 echo "==========================================${NC}"
 echo ""
 echo -e "${CYAN}Files created:${NC}"
@@ -485,10 +491,15 @@ echo "  contracts/prc20-lp-lock/src/error.rs"
 echo "  contracts/prc20-lp-lock/src/lib.rs"
 echo "  contracts/prc20-lp-lock/Cargo.toml"
 echo ""
-echo -e "${YELLOW}Dependency versions (Edition 2021 compatible):${NC}"
-echo "  cosmwasm-std: 1.5.0"
-echo "  cosmwasm-schema: 1.5.0"
-echo "  cw-storage-plus: 1.2.0"
+echo -e "${YELLOW}Dependency versions (PINNED for stability):${NC}"
+echo "  cosmwasm-std: =1.5.0"
+echo "  serde: =1.0.210"
+echo "  schemars: =0.8.16"
+echo "  thiserror: =1.0.50"
+echo ""
+echo -e "${GREEN}FIX APPLIED:${NC}"
+echo "  [patch.crates-io] rmp-serde = =1.3.0"
+echo "  (prevents edition2024 requirement)"
 echo ""
 echo -e "${YELLOW}Next step:${NC}"
 echo "  ./build_lp_lock.sh"
