@@ -1,5 +1,5 @@
+# generate_lp_lock.sh - FIXED FULL
 #!/usr/bin/env bash
-# paxi network - CORRECT FIX for edition2024 error
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
@@ -10,18 +10,15 @@ NC='\033[0m'
 clear
 echo -e "${BLUE}=========================================="
 echo "  LP LOCK CONTRACT GENERATOR"
-echo "  Edition 2021 - Rust 1.83 Compatible"
-echo "  CORRECT FIX: Pinned dependencies"
+echo "  Edition 2021 - Cargo 1.83 Compatible"
 echo "==========================================${NC}"
 
-# Cek Rust
 if ! command -v cargo &> /dev/null; then
     echo -e "${RED}✗ Rust tidak ditemukan!${NC}"
     echo "Install: pkg install rust -y"
     exit 1
 fi
 
-# Cek wasm target
 if ! rustc --print target-list | grep -q "wasm32-unknown-unknown"; then
     echo -e "${RED}✗ wasm32-unknown-unknown tidak tersedia!${NC}"
     echo "Reinstall rust: pkg reinstall rust -y"
@@ -31,11 +28,9 @@ fi
 echo -e "${GREEN}✓ Requirements OK${NC}"
 echo ""
 
-# Create project
 mkdir -p contracts/prc20-lp-lock/src
 cd contracts/prc20-lp-lock
 
-# CORRECT FIX: Pin exact versions (no patch needed)
 cat > Cargo.toml << 'EOF'
 [package]
 name = "prc20-lp-lock"
@@ -56,6 +51,9 @@ thiserror = "1.0.50"
 
 [dev-dependencies]
 cw-multi-test = "0.20.0"
+
+[patch.crates-io]
+base64ct = { version = "=1.6.0" }
 EOF
 
 cat > src/lib.rs << 'EOF'
@@ -474,24 +472,5 @@ EOF
 cd ../..
 
 echo ""
-echo -e "${GREEN}=========================================="
-echo "  ✓ LP Lock Contract Generated!"
-echo "  ✓ Dependencies pinned (no edition2024)"
-echo "==========================================${NC}"
-echo ""
-echo -e "${CYAN}Files created:${NC}"
-echo "  contracts/prc20-lp-lock/src/contract.rs"
-echo "  contracts/prc20-lp-lock/src/msg.rs"
-echo "  contracts/prc20-lp-lock/src/state.rs"
-echo "  contracts/prc20-lp-lock/src/error.rs"
-echo "  contracts/prc20-lp-lock/src/lib.rs"
-echo "  contracts/prc20-lp-lock/Cargo.toml"
-echo ""
-echo -e "${YELLOW}Dependency versions (Edition 2021 compatible):${NC}"
-echo "  cosmwasm-std: 1.5.0"
-echo "  serde: 1.0.193 (safe, no rmp-serde conflict)"
-echo "  schemars: 0.8.16"
-echo ""
-echo -e "${YELLOW}Next step:${NC}"
-echo "  ./build_lp_lock.sh"
-echo ""
+echo -e "${GREEN}✓ LP Lock Contract Generated!${NC}"
+echo -e "${YELLOW}Next: ./build_lp_lock.sh${NC}"

@@ -1,5 +1,5 @@
+# generate_vesting.sh - FIXED FULL
 #!/usr/bin/env bash
-# paxi network - CORRECT FIX for edition2024 error
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
@@ -9,30 +9,17 @@ NC='\033[0m'
 clear
 echo -e "${BLUE}=========================================="
 echo "  VESTING CONTRACT GENERATOR"
-echo "  Edition 2021 - Rust 1.83 Compatible"
-echo "  CORRECT FIX: Pinned dependencies"
+echo "  Edition 2021 - Cargo 1.83 Compatible"
 echo "==========================================${NC}"
 
-# Cek Rust
 if ! command -v cargo &> /dev/null; then
     echo -e "${RED}✗ Rust tidak ditemukan!${NC}"
-    echo "Install: pkg install rust -y"
     exit 1
 fi
-
-if ! rustc --print target-list | grep -q "wasm32-unknown-unknown"; then
-    echo -e "${RED}✗ wasm32-unknown-unknown tidak tersedia!${NC}"
-    echo "Reinstall rust: pkg reinstall rust -y"
-    exit 1
-fi
-
-echo -e "${GREEN}✓ Requirements OK${NC}"
-echo ""
 
 mkdir -p contracts/prc20-vesting/src
 cd contracts/prc20-vesting
 
-# CORRECT FIX: Pin exact versions (no patch needed)
 cat > Cargo.toml << 'EOF'
 [package]
 name = "prc20-vesting"
@@ -53,6 +40,9 @@ thiserror = "1.0.50"
 
 [dev-dependencies]
 cw-multi-test = "0.20.0"
+
+[patch.crates-io]
+base64ct = { version = "=1.6.0" }
 EOF
 
 cat > src/lib.rs << 'EOF'
@@ -134,7 +124,7 @@ EOF
 
 cat > src/state.rs << 'EOF'
 use cosmwasm_std::{Addr, Uint128};
-use cw_storage-plus::{Item, Map};
+use cw_storage_plus::{Item, Map};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -264,7 +254,6 @@ fn execute_create_vesting(
 ) -> Result<Response, ContractError> {
     let config = CONFIG.load(deps.storage)?;
     
-    // Only owner can create vesting
     if info.sender != config.owner {
         return Err(ContractError::Unauthorized {});
     }
@@ -279,12 +268,10 @@ fn execute_create_vesting(
     
     let beneficiary = deps.api.addr_validate(&beneficiary)?;
     
-    // Prevent duplicate vesting
     if VESTING_SCHEDULES.has(deps.storage, beneficiary.clone()) {
         return Err(ContractError::VestingAlreadyExists {});
     }
     
-    // Safe arithmetic untuk time calculations
     let cliff_time = start_time.checked_add(cliff_duration)
         .ok_or(ContractError::Std(cosmwasm_std::StdError::generic_err("Cliff time overflow")))?;
     let end_time = start_time.checked_add(vesting_duration)
@@ -349,7 +336,6 @@ fn execute_claim(
         return Err(ContractError::NoTokensToClaim {});
     }
     
-    // Update claimed BEFORE transfer untuk prevent reentrancy
     vesting.claimed_amount = vesting.claimed_amount.checked_add(claimable)?;
     VESTING_SCHEDULES.save(deps.storage, info.sender.clone(), &vesting)?;
     
@@ -377,7 +363,6 @@ fn execute_revoke_vesting(
 ) -> Result<Response, ContractError> {
     let config = CONFIG.load(deps.storage)?;
     
-    // Only owner can revoke
     if info.sender != config.owner {
         return Err(ContractError::Unauthorized {});
     }
@@ -389,17 +374,14 @@ fn execute_revoke_vesting(
     
     if vesting.revoked {
         return Err(ContractError::VestingRevoked {});
-    }
-    
+        ```bash
     let current_time = env.block.time.seconds();
     let vested_amount = calculate_vested_amount(&vesting, current_time);
     let unvested = vesting.total_amount.checked_sub(vested_amount)?;
     
-    // Mark as revoked
     vesting.revoked = true;
     VESTING_SCHEDULES.save(deps.storage, beneficiary_addr.clone(), &vesting)?;
     
-    // Return unvested tokens to owner
     let mut messages = vec![];
     if !unvested.is_zero() {
         messages.push(WasmMsg::Execute {
@@ -428,7 +410,6 @@ fn calculate_vested_amount(vesting: &Vesting, current_time: u64) -> Uint128 {
         return vesting.total_amount;
     }
     
-    // Linear vesting calculation dengan safe math
     let elapsed = current_time.saturating_sub(vesting.start_time);
     let total_duration = vesting.end_time.saturating_sub(vesting.start_time);
     
@@ -528,24 +509,5 @@ EOF
 cd ../..
 
 echo ""
-echo -e "${GREEN}=========================================="
-echo "  ✓ Vesting Contract Generated!"
-echo "  ✓ Dependencies pinned (no edition2024)"
-echo "==========================================${NC}"
-echo ""
-echo -e "${CYAN}Files created:${NC}"
-echo "  contracts/prc20-vesting/src/contract.rs"
-echo "  contracts/prc20-vesting/src/msg.rs"
-echo "  contracts/prc20-vesting/src/state.rs"
-echo "  contracts/prc20-vesting/src/error.rs"
-echo "  contracts/prc20-vesting/src/lib.rs"
-echo "  contracts/prc20-vesting/Cargo.toml"
-echo ""
-echo -e "${YELLOW}Dependency versions (Edition 2021 compatible):${NC}"
-echo "  cosmwasm-std: 1.5.0"
-echo "  serde: 1.0.193 (safe, no rmp-serde conflict)"
-echo "  schemars: 0.8.16"
-echo ""
-echo -e "${YELLOW}Next step:${NC}"
-echo "  ./build_vesting.sh"
-echo ""
+echo -e "${GREEN}✓ Vesting Contract Generated!${NC}"
+echo -e "${YELLOW}Next: ./build_vesting.sh${NC}"
