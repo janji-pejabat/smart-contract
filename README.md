@@ -15,7 +15,7 @@ Build CosmWasm contracts langsung dari HP Android pake Termux.
 
 ## PERSIAPAN AWAL
 
-Sebelum install tools Paxi, setup dulu requirement dasarnya.
+Sebelum generate contracts, setup dulu requirement dasarnya.
 
 ### Update Termux
 
@@ -107,77 +107,45 @@ Kalau semua command di atas berhasil, lanjut ke step berikutnya.
 
 ---
 
-## INSTALL PAXI TOOLS
+## DOWNLOAD SCRIPTS
 
-Sekarang baru install script generator dan builder:
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/janji-pejabat/smart-contract/main/install.sh | bash
-```
-
-Script ini akan:
-- Download semua script generator
-- Setup command shortcut
-- Verifikasi environment
-
-Tunggu sampai muncul:
-```
-Installation complete!
-Ready to build Paxi contracts!
-```
-
-Restart Termux atau reload environment:
+Download script generator dari GitHub:
 
 ```bash
-source ~/.bashrc
-```
+# LP Lock Contract
+curl -O https://raw.githubusercontent.com/janji-pejabat/repo/main/generate_lp_lock.sh
+curl -O https://raw.githubusercontent.com/janji-pejabat/repo/main/build_lp_lock.sh
+chmod +x generate_lp_lock.sh build_lp_lock.sh
 
+# Vesting Contract
+curl -O https://raw.githubusercontent.com/janji-pejabat/repo/main/generate_vesting.sh
+curl -O https://raw.githubusercontent.com/janji-pejabat/repo/main/build_vesting.sh
+chmod +x generate_vesting.sh build_vesting.sh
+```
 ---
 
-## CARA PAKAI
+## GENERATE & BUILD CONTRACTS
 
-### Generate Contract
+### LP Lock Contract
+
+#### Generate
 
 ```bash
-paxi-generate
+./generate_lp_lock.sh
 ```
-
-Menu yang muncul:
-```
-Pilih contract yang ingin di-generate:
-
-  1) LP Lock saja (recommended untuk mulai)
-  2) Vesting saja
-  3) Keduanya (akan pakai shared dependencies)
-  4) Exit
-```
-
-Untuk pertama kali, pilih 1 (LP Lock).
 
 Script akan generate file-file contract di folder `prc20-lp-lock/`:
-- `src/contract.rs`: logic utama
+- `src/contract.rs`: logic utama dengan security protections
 - `src/msg.rs`: message definitions
 - `src/state.rs`: state management
 - `src/error.rs`: error handling
 - `Cargo.toml`: dependencies
 
-### Build Contract
+#### Build
 
 ```bash
-paxi-build
+./build_lp_lock.sh
 ```
-
-Menu yang muncul:
-```
-Pilih contract yang ingin di-build:
-
-  1) LP Lock saja
-  2) Vesting saja
-  3) Keduanya (sequential, hemat memory)
-  4) Exit
-```
-
-Pilih 1 untuk build LP Lock.
 
 Proses build ada 3 tahap:
 1. Compile ke WASM (5-10 menit first build)
@@ -188,30 +156,25 @@ Setelah selesai, file hasil ada di `artifacts/prc20_lp_lock_optimized.wasm`
 
 Build pertama paling lama karena download dependencies (~150MB). Build selanjutnya jauh lebih cepat (2-3 menit).
 
-Saat ditanya clean cache:
-```
-Clean build cache untuk hemat storage? [y/n]:
-```
+### Vesting Contract
 
-Ketik `y` kalau mau hemat storage (~200MB). File WASM hasil build tetap aman di folder artifacts.
-
-### Deploy Contract
+#### Generate
 
 ```bash
-paxi-deploy
+./generate_vesting.sh
 ```
 
-Prerequisite untuk deploy:
-- Sudah punya wallet Paxi
-- Sudah install `paxid` CLI
-- Ada balance minimal 0.1 PAXI untuk gas fee
+Script akan generate contract di folder `prc20-vesting/` dengan struktur yang sama.
 
-Wizard akan tanya:
-1. Nama wallet
-2. Pilih network (testnet/mainnet)
-3. Konfirmasi deploy
+#### Build
 
-Rekomendasi: test di testnet dulu sebelum deploy ke mainnet.
+```bash
+./build_vesting.sh
+```
+
+Kalau sudah pernah build LP Lock, build Vesting lebih cepat karena dependencies sudah ada.
+
+File hasil: `artifacts/prc20_vesting_optimized.wasm`
 
 ---
 
@@ -265,7 +228,6 @@ export CARGO_BUILD_JOBS=1
 # Tutup aplikasi lain
 # Restart Termux
 # Build ulang
-paxi-build
 ```
 
 Atau buat swap file (butuh storage lebih):
@@ -289,12 +251,11 @@ Build cache Rust bikin storage penuh.
 Solusi:
 ```bash
 # Clean cache contract tertentu
-cd ~/smart-contract/prc20-lp-lock
+cd prc20-lp-lock
 cargo clean
 
 # Atau clean semua
-cd ~/smart-contract
-rm -rf */target/
+rm -rf prc20-*/target/
 
 # Clean cargo global cache (ekstrim, re-download deps next build)
 rm -rf ~/.cargo/registry/
@@ -307,31 +268,10 @@ Biasanya karena cache corrupt atau dependency conflict.
 Solusi:
 ```bash
 # Clean dan rebuild
-cd ~/smart-contract/prc20-lp-lock
+cd prc20-lp-lock
 cargo clean
 cd ..
-paxi-build
-```
-
-### Command not found: paxi-generate / paxi-build / paxi-deploy
-
-Shortcut command belum ke-load.
-
-Solusi:
-```bash
-# Reload bashrc
-source ~/.bashrc
-
-# Atau restart Termux
-
-# Kalau masih error, cek apakah file script ada
-ls ~/smart-contract/
-
-# Jalankan langsung tanpa shortcut
-cd ~/smart-contract
-./generate_contracts_smart.sh
-./build_smart.sh
-./deploy_smart.sh
+./build_lp_lock.sh
 ```
 
 ---
@@ -374,9 +314,74 @@ Tips hemat storage:
 
 ---
 
+## DEPLOYMENT
+
+### Prerequisite
+
+- Sudah punya wallet Paxi
+- Sudah install `paxid` CLI
+- Ada balance minimal 0.1 PAXI untuk gas fee
+
+### Deploy LP Lock
+
+```bash
+# Upload contract
+paxid tx wasm store artifacts/prc20_lp_lock_optimized.wasm \
+  --from wallet-name \
+  --gas 3000000 \
+  --fees 15000upaxi \
+  --chain-id paxi-testnet-1 \
+  --node https://testnet-rpc.paxinet.io:443 \
+  --yes
+
+# Catat CODE_ID dari output
+
+# Instantiate
+paxid tx wasm instantiate <CODE_ID> '{}' \
+  --from wallet-name \
+  --label "LP Lock v1.0.0" \
+  --admin <your-address> \
+  --gas auto \
+  --fees 10000upaxi \
+  --chain-id paxi-testnet-1 \
+  --node https://testnet-rpc.paxinet.io:443 \
+  --yes
+```
+
+### Deploy Vesting
+
+```bash
+# Upload contract
+paxid tx wasm store artifacts/prc20_vesting_optimized.wasm \
+  --from wallet-name \
+  --gas 3000000 \
+  --fees 15000upaxi \
+  --chain-id paxi-testnet-1 \
+  --node https://testnet-rpc.paxinet.io:443 \
+  --yes
+
+# Instantiate dengan token address
+paxid tx wasm instantiate <CODE_ID> \
+  '{"token_addr":"paxi1token..."}' \
+  --from wallet-name \
+  --label "Vesting v1.0.0" \
+  --admin <your-address> \
+  --gas auto \
+  --fees 10000upaxi \
+  --chain-id paxi-testnet-1 \
+  --node https://testnet-rpc.paxinet.io:443 \
+  --yes
+```
+
+Rekomendasi: test di testnet dulu sebelum deploy ke mainnet.
+
+---
+
 ## CARA PAKAI CONTRACT
 
-### Lock Token by Time
+### LP Lock Contract
+
+#### Lock Token by Time
 
 ```bash
 paxid tx wasm execute <contract-address> \
@@ -391,7 +396,7 @@ paxid tx wasm execute <contract-address> \
   --fees 5000upaxi
 ```
 
-### Lock Token by Block Height
+#### Lock Token by Block Height
 
 ```bash
 paxid tx wasm execute <contract-address> \
@@ -406,7 +411,7 @@ paxid tx wasm execute <contract-address> \
   --fees 5000upaxi
 ```
 
-### Unlock Token
+#### Unlock Token
 
 ```bash
 paxid tx wasm execute <contract-address> \
@@ -417,7 +422,7 @@ paxid tx wasm execute <contract-address> \
   --fees 5000upaxi
 ```
 
-### Query Lock Info
+#### Query Lock Info
 
 ```bash
 paxid query wasm contract-state smart <contract-address> \
@@ -428,7 +433,7 @@ paxid query wasm contract-state smart <contract-address> \
   --chain-id paxi-testnet-1
 ```
 
-### Query Total Locked
+#### Query Total Locked
 
 ```bash
 paxid query wasm contract-state smart <contract-address> \
@@ -438,7 +443,19 @@ paxid query wasm contract-state smart <contract-address> \
   --chain-id paxi-testnet-1
 ```
 
-### Create Vesting Schedule
+#### Query All Locks (by Owner)
+
+```bash
+paxid query wasm contract-state smart <contract-address> \
+  '{"all_locks":{
+    "owner":"paxi1user..."
+  }}' \
+  --chain-id paxi-testnet-1
+```
+
+### Vesting Contract
+
+#### Create Vesting Schedule
 
 ```bash
 paxid tx wasm execute <contract-address> \
@@ -455,7 +472,12 @@ paxid tx wasm execute <contract-address> \
   --fees 5000upaxi
 ```
 
-### Claim Vested Tokens
+Parameter penjelasan:
+- `start_time`: Unix timestamp kapan vesting mulai
+- `cliff_duration`: Durasi cliff dalam detik (contoh: 7776000 = 90 hari)
+- `vesting_duration`: Total durasi vesting dalam detik (contoh: 31536000 = 1 tahun)
+
+#### Claim Vested Tokens
 
 ```bash
 paxid tx wasm execute <contract-address> \
@@ -466,6 +488,57 @@ paxid tx wasm execute <contract-address> \
   --fees 5000upaxi
 ```
 
+#### Revoke Vesting (Owner Only)
+
+```bash
+paxid tx wasm execute <contract-address> \
+  '{"revoke_vesting":{
+    "beneficiary":"paxi1user..."
+  }}' \
+  --from owner-wallet \
+  --chain-id paxi-testnet-1 \
+  --gas auto \
+  --fees 5000upaxi
+```
+
+Unvested tokens akan dikembalikan ke owner.
+
+#### Query Vesting Info
+
+```bash
+paxid query wasm contract-state smart <contract-address> \
+  '{"vesting_info":{
+    "beneficiary":"paxi1user..."
+  }}' \
+  --chain-id paxi-testnet-1
+```
+
+#### Query Claimable Amount
+
+```bash
+paxid query wasm contract-state smart <contract-address> \
+  '{"claimable_amount":{
+    "beneficiary":"paxi1user..."
+  }}' \
+  --chain-id paxi-testnet-1
+```
+
+#### Query All Vesting Schedules
+
+```bash
+paxid query wasm contract-state smart <contract-address> \
+  '{"all_vesting":{}}' \
+  --chain-id paxi-testnet-1
+```
+
+#### Query Contract Config
+
+```bash
+paxid query wasm contract-state smart <contract-address> \
+  '{"config":{}}' \
+  --chain-id paxi-testnet-1
+```
+
 ---
 
 ## STRUKTUR PROJECT
@@ -473,7 +546,7 @@ paxid tx wasm execute <contract-address> \
 Setelah generate dan build, struktur folder jadi seperti ini:
 
 ```
-smart-contract/
+/
 ├── prc20-lp-lock/
 │   ├── src/
 │   │   ├── contract.rs
@@ -485,26 +558,63 @@ smart-contract/
 │   └── target/ (build cache, bisa dihapus setelah build)
 │
 ├── prc20-vesting/
-│   └── (struktur sama dengan LP Lock)
+│   ├── src/
+│   │   ├── contract.rs
+│   │   ├── msg.rs
+│   │   ├── state.rs
+│   │   ├── error.rs
+│   │   └── lib.rs
+│   ├── Cargo.toml
+│   └── target/ (build cache, bisa dihapus setelah build)
 │
 ├── artifacts/
 │   ├── prc20_lp_lock_optimized.wasm
 │   └── prc20_vesting_optimized.wasm
 │
-├── generate_contracts_smart.sh
-├── build_smart.sh
-├── deploy_smart.sh
-├── check_requirements.sh
-└── deployment_info.txt
+├── generate_lp_lock.sh
+├── build_lp_lock.sh
+├── generate_vesting.sh
+└── build_vesting.sh
 ```
 
 File yang penting:
 - `artifacts/*.wasm`: hasil compile, ini yang di-deploy
-- `deployment_info.txt`: catatan contract yang sudah di-deploy
+- `src/*.rs`: source code contracts
 
 File yang bisa dihapus untuk hemat storage:
 - `*/target/`: build cache
 - `~/.cargo/registry/`: dependencies cache
+
+---
+
+## SECURITY FEATURES
+
+### LP Lock Contract
+
+✅ **Overflow Protection** - Semua operasi arithmetic pakai checked methods  
+✅ **Reentrancy Protection** - State update sebelum external call  
+✅ **Access Control** - Hanya owner yang bisa unlock token mereka  
+✅ **Input Validation** - Validasi amount, time, dan height  
+✅ **Double Unlock Prevention** - Flag `is_unlocked` mencegah unlock berkali-kali  
+✅ **Safe Math** - Semua addition/subtraction pakai `checked_add/checked_sub`
+
+### Vesting Contract
+
+✅ **Overflow Protection** - Time calculations pakai checked arithmetic  
+✅ **Reentrancy Protection** - Update claimed_amount sebelum transfer  
+✅ **Access Control** - Only owner bisa create/revoke vesting  
+✅ **Revoke Protection** - Owner bisa revoke dan ambil unvested tokens  
+✅ **Division by Zero** - Cek total_duration sebelum calculation  
+✅ **Duplicate Prevention** - Cek vesting sudah exists atau belum  
+✅ **Safe Math** - Semua operasi pakai safe methods
+
+### Rekomendasi Sebelum Mainnet
+
+- Test extensively di testnet
+- Code review dengan developer lain
+- Audit oleh security expert kalau handle dana besar
+- Start dengan amount kecil di mainnet
+- Monitor contract activity
 
 ---
 
@@ -553,28 +663,20 @@ rustup update stable
 
 ```bash
 ls -lh artifacts/
-du -h artifacts/prc20_lp_lock_optimized.wasm
+du -h artifacts/*.wasm
 ```
 
 Contract yang bagus biasanya di bawah 500KB setelah optimize.
 
----
+### Clean All Build Cache
 
-## SECURITY NOTES
+```bash
+# Clean semua target folders
+rm -rf prc20-*/target/
 
-Contract ini sudah implement:
-- Checked math operations (no overflow)
-- Re-entrancy protection
-- Input validation
-- Access control
-
-Tapi tetap lakukan audit sebelum deploy ke mainnet dengan dana besar.
-
-Rekomendasi:
-- Test extensively di testnet
-- Code review dengan developer lain
-- Audit oleh security expert kalau handle dana besar
-- Start dengan amount kecil di mainnet
+# Clean cargo cache (akan re-download dependencies)
+cargo clean
+```
 
 ---
 
@@ -594,3 +696,7 @@ Community:
 - Telegram: https://t.me/paxi_network
 
 ---
+
+## LICENSE
+
+MIT © 2025 Paxi Network Contributors
