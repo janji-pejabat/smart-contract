@@ -42,8 +42,8 @@ edition = "2021"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-cosmwasm-std = "2.2.0"
-cosmwasm-schema = "2.2.0"
+cosmwasm-std = "2.1.0"
+cosmwasm-schema = "2.1.0"
 cw-storage-plus = "2.0.0"
 cw2 = "2.0.0"
 schemars = "0.8"
@@ -52,7 +52,7 @@ thiserror = "2.0"
 rmp = "=0.8.14"
 
 [dev-dependencies]
-cw-multi-test = "2.2.0"
+cw-multi-test = "2.1.0"
 EOF
 
 cat > src/lib.rs << 'EOF'
