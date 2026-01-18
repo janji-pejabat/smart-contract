@@ -1,405 +1,296 @@
-# PAXI SMART CONTRACTS - TERMUX
+# PAXI SMART CONTRACTS
 
-Build CosmWasm contracts langsung dari HP Android pake Termux.
+Tutorial deploy smart contract LP Lock dan Vesting ke Paxi blockchain mainnet menggunakan Termux.
+
+---
+
+## DAFTAR ISI
+
+1. [File WASM Artifacts](#file-wasm-artifacts)
+2. [Requirements](#requirements)
+3. [Setup Termux](#setup-termux)
+4. [Deploy ke Paxi Mainnet](#deploy-ke-paxi-mainnet)
+5. [Cara Pakai Contract](#cara-pakai-contract)
+6. [Troubleshooting](#troubleshooting)
+
+---
+
+## FILE WASM ARTIFACTS
+
+File WASM sudah di-build dan tersedia di GitHub Actions artifacts:
+
+### Artifacts yang Tersedia
+
+1. **paxi-contracts-release.zip** (132 KB)
+   - Berisi: `prc20_lp_lock_optimized.wasm` + `prc20_vesting_optimized.wasm`
+   
+2. **prc20-lp-lock-wasm.zip** (63.9 KB)
+   - Berisi: `prc20_lp_lock_optimized.wasm`
+   
+3. **prc20-vesting-wasm.zip** (68.4 KB)
+   - Berisi: `prc20_vesting_optimized.wasm`
+
+**File sudah di-download dan ada di folder Download HP Anda.**
 
 ---
 
 ## REQUIREMENTS
 
-- Android 7.0 ke atas
-- RAM minimal 2GB (rekomendasi 4GB)
-- Storage kosong minimal 1GB
-- Koneksi internet stabil
+### Perangkat
+- Android 7.0+
+- RAM 2GB minimum
+- Storage 500MB kosong
+- Koneksi internet
+
+### Yang Diperlukan
+- Termux (dari F-Droid)
+- Wallet Paxi dengan balance 0.1 PAXI minimum
+- File WASM sudah di-download
 
 ---
 
-## PERSIAPAN AWAL
+## SETUP TERMUX
 
-Sebelum generate contracts, setup dulu requirement dasarnya.
-
-### Update Termux
+### 1. Update & Install Tools
 
 ```bash
 pkg update && pkg upgrade -y
+pkg install curl wget git jq unzip -y
 ```
 
-Proses ini download update package Termux. Tunggu sampai selesai.
-
-### Install Build Tools
+### 2. Setup Storage Access
 
 ```bash
-pkg install curl git clang binutils binaryen jq bc -y
+termux-setup-storage
 ```
 
-Package yang diinstall:
-- curl: download files
-- git: version control
-- clang: C compiler
-- binutils: binary utilities
-- binaryen: WebAssembly optimizer (wasm-opt)
-- jq: JSON processor
-- bc: calculator untuk script
+Tekan "Allow" saat popup muncul.
 
-### Install Rust (Termux)
+### 3. Buat Folder Kerja
 
 ```bash
-pkg install rust -y
+mkdir -p ~/paxi-deploy
+cd ~/paxi-deploy
 ```
 
-**PENTING:** Di Termux, Rust sudah include wasm32 target. Tidak perlu rustup.
-
-Proses install Rust biasanya 2-5 menit tergantung koneksi internet.
-
-### Verifikasi Rust Terinstall
+### 4. Copy File WASM dari Download
 
 ```bash
-rustc --version
+# Copy file dari Download ke Termux
+cp /storage/emulated/0/Download/paxi-contracts-release.zip .
+
+# Extract
+unzip paxi-contracts-release.zip
 ```
-Output: `rustc 1.92.0` atau versi terbaru
+
+### 5. Verify File
 
 ```bash
-cargo --version
+ls -lh *.wasm
 ```
-Output: `cargo 1.92.0` atau versi terbaru
 
-```bash
-wasm-opt --version
+Output:
 ```
-Output: `wasm-opt version 125` atau versi terbaru
-
-```bash
-rustc --print target-list | grep wasm32
+prc20_lp_lock_optimized.wasm    ~64K
+prc20_vesting_optimized.wasm    ~68K
 ```
-Output harus ada: `wasm32-unknown-unknown`
 
-Kalau semua command di atas berhasil, lanjut ke step berikutnya.
-
+path:
+```
+/storage/emulated/0/Download/prc20_lp_lock_optimized.wasm
+/storage/emulated/0/Download/prc20_vesting_optimized.wasm
+```
 ---
 
-## DOWNLOAD SCRIPTS
+## DEPLOY KE PAXI MAINNET
 
-Download script generator dari GitHub:
+### Install Paxid CLI
 
 ```bash
-# Buat folder kerja
-mkdir -p ~/paxi-contracts
-cd ~/paxi-contracts
+# Download paxid
+wget https://github.com/paxi-web3/paxi/releases/latest/download/paxid-android-arm64 -O paxid
+chmod +x paxid
 
-# Download LP Lock scripts
-curl -fsSL https://raw.githubusercontent.com/janji-pejabat/smart-contract/main/generate_lp_lock.sh -o generate_lp_lock.sh
-curl -fsSL https://raw.githubusercontent.com/janji-pejabat/smart-contract/main/build_lp_lock.sh -o build_lp_lock.sh
+# Move to bin
+mkdir -p ~/bin
+mv paxid ~/bin/
 
-# Download Vesting scripts
-curl -fsSL https://raw.githubusercontent.com/janji-pejabat/smart-contract/main/generate_vesting.sh -o generate_vesting.sh
-curl -fsSL https://raw.githubusercontent.com/janji-pejabat/smart-contract/main/build_vesting.sh -o build_vesting.sh
-
-# Set executable
-chmod +x *.sh
+# Add to PATH
+echo 'export PATH=$PATH:~/bin' >> ~/.bashrc
+source ~/.bashrc
 ```
 
-Atau download semua sekaligus:
-
+Verify:
 ```bash
-curl -fsSL https://raw.githubusercontent.com/janji-pejabat/smart-contract/main/install.sh | bash
+paxid version
 ```
 
----
+### Setup Wallet
 
-## GENERATE & BUILD CONTRACTS
-
-### LP Lock Contract
-
-#### Generate
+#### Buat Wallet Baru
 
 ```bash
-./generate_lp_lock.sh
+paxid keys add mywallet
 ```
 
-Script akan generate file-file contract di folder `prc20-lp-lock/`:
-- `src/contract.rs`: logic utama dengan security protections
-- `src/msg.rs`: message definitions
-- `src/state.rs`: state management
-- `src/error.rs`: error handling
-- `Cargo.toml`: dependencies
+**⚠️ PENTING: Simpan mnemonic 24 kata dengan AMAN!**
 
-#### Build
+#### Import Wallet
 
 ```bash
-./build_lp_lock.sh
+paxid keys add mywallet --recover
 ```
 
-Proses build ada 3 tahap:
-1. Compile ke WASM (5-10 menit first build)
-2. Optimize dengan wasm-opt
-3. Copy ke folder artifacts
-
-Setelah selesai, file hasil ada di `artifacts/prc20_lp_lock_optimized.wasm`
-
-Build pertama paling lama karena download dependencies (~150MB). Build selanjutnya jauh lebih cepat (2-3 menit).
-
-### Vesting Contract
-
-#### Generate
+#### Cek Address
 
 ```bash
-./generate_vesting.sh
+paxid keys show mywallet -a
 ```
 
-Script akan generate contract di folder `prc20-vesting/` dengan struktur yang sama.
-
-#### Build
+#### Cek Balance
 
 ```bash
-./build_vesting.sh
+paxid q bank balances $(paxid keys show mywallet -a)
 ```
 
-Kalau sudah pernah build LP Lock, build Vesting lebih cepat karena dependencies sudah ada.
+### Deploy LP Lock Contract
 
-File hasil: `artifacts/prc20_vesting_optimized.wasm`
-
----
-
-## TROUBLESHOOTING
-
-### Error: rustup command not found
-
-Di Termux, tidak pakai rustup. Rust diinstall via pkg.
-
-Solusi:
-```bash
-# Install Rust dari Termux package
-pkg install rust -y
-
-# Cek versi
-rustc --version
-cargo --version
-```
-
-### Error: wasm32-unknown-unknown not installed
-
-Di Termux, wasm32 target sudah include di package rust.
-
-Cek apakah tersedia:
-```bash
-rustc --print target-list | grep wasm32
-```
-
-Kalau tidak ada, reinstall rust:
-```bash
-pkg reinstall rust -y
-```
-
-### Error: wasm-opt not found
-
-Binaryen belum terinstall.
-
-Solusi:
-```bash
-pkg install binaryen -y
-```
-
-### Out of memory saat build
-
-HP kehabisan RAM saat compile.
-
-Solusi:
-```bash
-# Limit parallel compilation
-export CARGO_BUILD_JOBS=1
-
-# Tutup aplikasi lain
-# Restart Termux
-# Build ulang
-```
-
-Atau buat swap file (butuh storage lebih):
-```bash
-cd ~
-dd if=/dev/zero of=swapfile bs=1M count=512
-chmod 600 swapfile
-mkswap swapfile
-swapon swapfile
-```
-
-Cek swap aktif:
-```bash
-free -h
-```
-
-### Storage penuh
-
-Build cache Rust bikin storage penuh.
-
-Solusi:
-```bash
-# Clean cache contract tertentu
-cd prc20-lp-lock
-cargo clean
-
-# Atau clean semua
-rm -rf prc20-*/target/
-
-# Clean cargo global cache (ekstrim, re-download deps next build)
-rm -rf ~/.cargo/registry/
-```
-
-### Build error: linking failed
-
-Biasanya karena cache corrupt atau dependency conflict.
-
-Solusi:
-```bash
-# Clean dan rebuild
-cd prc20-lp-lock
-cargo clean
-cd ..
-./build_lp_lock.sh
-```
-
----
-
-## ESTIMASI WAKTU
-
-### First Build (dengan download dependencies)
-
-RAM 2GB: 10-15 menit  
-RAM 4GB: 6-10 menit  
-RAM 6GB+: 4-6 menit
-
-### Subsequent Build (dependencies sudah ada)
-
-RAM 2GB: 3-5 menit  
-RAM 4GB: 2-3 menit  
-RAM 6GB+: 1-2 menit
-
-### Deploy ke Network
-
-Upload contract: 30-60 detik  
-Instantiate: 10-20 detik  
-Total: ~2-3 menit
-
----
-
-## PENGGUNAAN STORAGE
-
-Source code contract: ~50KB  
-Rust dependencies: ~150MB (shared)  
-Build cache per contract: ~200MB  
-Final WASM optimized: ~400KB
-
-Total yang diperlukan: 500MB - 1GB
-
-Tips hemat storage:
-- Build satu contract dulu, clean cache, baru build yang lain
-- Hapus folder target setelah dapat file WASM
-- Jangan install terlalu banyak contract sekaligus
-
----
-
-## DEPLOYMENT
-
-### Prerequisite
-
-- Sudah punya wallet Paxi
-- Sudah install `paxid` CLI
-- Ada balance minimal 0.1 PAXI untuk gas fee
-
-### Deploy LP Lock
+#### 1. Upload WASM
 
 ```bash
-# Upload contract
-paxid tx wasm store artifacts/prc20_lp_lock_optimized.wasm \
-  --from wallet-name \
-  --gas 3000000 \
-  --fees 15000upaxi \
-  --chain-id paxi-testnet-1 \
-  --node https://testnet-rpc.paxinet.io:443 \
-  --yes
-
-# Catat CODE_ID dari output
-
-# Instantiate
-paxid tx wasm instantiate <CODE_ID> '{}' \
-  --from wallet-name \
-  --label "LP Lock v1.0.0" \
-  --admin <your-address> \
+paxid tx wasm store prc20_lp_lock_optimized.wasm \
+  --from mywallet \
   --gas auto \
   --fees 10000upaxi \
-  --chain-id paxi-testnet-1 \
-  --node https://testnet-rpc.paxinet.io:443 \
-  --yes
 ```
 
-### Deploy Vesting
+Catat **CODE_ID** dari output (contoh: 123)
+
+#### 2. Instantiate Contract
 
 ```bash
-# Upload contract
-paxid tx wasm store artifacts/prc20_vesting_optimized.wasm \
-  --from wallet-name \
-  --gas 3000000 \
-  --fees 15000upaxi \
-  --chain-id paxi-testnet-1 \
-  --node https://testnet-rpc.paxinet.io:443 \
-  --yes
+paxid tx wasm instantiate 123 '{}' \
+  --from mywallet \
+  --label "LP prc20 Lock v1.0" \
+  --admin $(paxid keys show mywallet -a) \
+  --gas auto \
+  --fees 10000upaxi \
+```
 
-# Instantiate dengan token address
-paxid tx wasm instantiate <CODE_ID> \
+Catat **CONTRACT_ADDRESS** (contoh: `paxi14hj2tav...`)
+
+### Deploy Vesting Contract
+
+#### 1. Upload WASM
+
+```bash
+paxid tx wasm store prc20_vesting_optimized.wasm \
+  --from mywallet \
+  --gas auto \
+  --fees 15000upaxi
+```
+
+Catat CODE_ID (contoh: 124)
+
+#### 2. Instantiate dengan Token Address
+
+```bash
+paxid tx wasm instantiate 124 \
   '{"token_addr":"paxi1token..."}' \
-  --from wallet-name \
-  --label "Vesting v1.0.0" \
-  --admin <your-address> \
+  --from mywallet \
+  --label "Vesting v1.0" \
+  --admin $(paxid keys show mywallet -a) \
   --gas auto \
   --fees 10000upaxi \
-  --chain-id paxi-testnet-1 \
-  --node https://testnet-rpc.paxinet.io:443 \
-  --yes
 ```
 
-Rekomendasi: test di testnet dulu sebelum deploy ke mainnet.
+Ganti `paxi1token...` dengan address token PRC20 Anda.
 
 ---
 
 ## CARA PAKAI CONTRACT
 
-### LP Lock Contract
+### LP LOCK CONTRACT
 
-#### Lock Token by Time
+#### Approve Token Dulu
 
 ```bash
-paxid tx wasm execute <contract-address> \
-  '{"lock_by_time":{
-    "token_addr":"paxi1token...",
-    "amount":"1000000000",
-    "unlock_time":1735689600
-  }}' \
-  --from wallet-name \
-  --chain-id paxi-testnet-1 \
+paxid tx wasm execute paxi12h8e2a7e4de4ksmyvg2tcv0utgkrrezerghyh3kla3czh6axwaaqwfurcf \
+  '{
+    "increase_allowance": {
+      "spender": "paxi1jd28dky85c9akyfpxk983ddwslwn0e4snkpsge27zx3tqlq7dcms8jskwki",
+      "amount": "1000000000"
+    }
+  }' \
+  --from mywallet \
+  --chain-id paxi-mainnet \
   --gas auto \
   --fees 5000upaxi
 ```
 
-#### Lock Token by Block Height
+#### Lock by Time
 
 ```bash
-paxid tx wasm execute <contract-address> \
-  '{"lock_by_height":{
-    "token_addr":"paxi1token...",
-    "amount":"1000000000",
-    "unlock_height":1000000
-  }}' \
-  --from wallet-name \
-  --chain-id paxi-testnet-1 \
+paxid tx wasm execute paxi1jd28dky85c9akyfpxk983ddwslwn0e4snkpsge27zx3tqlq7dcms8jskwki \
+  '{
+    "lock_by_time": {
+      "token_addr": "paxi12h8e2a7e4de4ksmyvg2tcv0utgkrrezerghyh3kla3czh6axwaaqwfurcf",
+      "amount": "1000000000",
+      "unlock_time": 1735689600
+    }
+  }' \
+  --from mywallet \
   --gas auto \
   --fees 5000upaxi
+```
+
+Parameter:
+- `token_addr`: Address token PRC20
+- `amount`: Jumlah token (dalam unit terkecil)
+- `unlock_time`: Unix timestamp
+
+Hitung timestamp:
+```bash
+# Sekarang
+date +%s
+
+# 7 hari dari sekarang
+echo $(($(date +%s) + 604800))
+```
+
+#### Lock by Height
+
+```bash
+paxid tx wasm execute paxi14hj2tav... \
+  '{
+    "lock_by_height": {
+      "token_addr": "paxi1token...",
+      "amount": "1000000000",
+      "unlock_height": 1000000
+    }
+  }' \
+  --from mywallet \
+  --chain-id paxi-mainnet \
+  --gas auto \
+  --fees 5000upaxi
+```
+
+Cek current height:
+```bash
+paxid status --node https://mainnet-rpc.paxinet.io:443 | jq -r .sync_info.latest_block_height
 ```
 
 #### Unlock Token
 
 ```bash
-paxid tx wasm execute <contract-address> \
-  '{"unlock":{"lock_id":1}}' \
-  --from wallet-name \
-  --chain-id paxi-testnet-1 \
+paxid tx wasm execute paxi14hj2tav... \
+  '{
+    "unlock": {
+      "lock_id": 1
+    }
+  }' \
+  --from mywallet \
+  --chain-id paxi-mainnet \
   --gas auto \
   --fees 5000upaxi
 ```
@@ -407,278 +298,448 @@ paxid tx wasm execute <contract-address> \
 #### Query Lock Info
 
 ```bash
-paxid query wasm contract-state smart <contract-address> \
-  '{"lock_info":{
-    "owner":"paxi1user...",
-    "lock_id":1
-  }}' \
-  --chain-id paxi-testnet-1
+paxid query wasm contract-state smart paxi14hj2tav... \
+  '{
+    "lock_info": {
+      "owner": "paxi1your...",
+      "lock_id": 1
+    }
+  }' \
+  --chain-id paxi-mainnet \
+  --output json | jq
+```
+
+#### Query All Locks
+
+```bash
+paxid query wasm contract-state smart paxi14hj2tav... \
+  '{
+    "all_locks": {
+      "owner": "paxi1your..."
+    }
+  }' \
+  --chain-id paxi-mainnet \
+  --output json | jq
 ```
 
 #### Query Total Locked
 
 ```bash
-paxid query wasm contract-state smart <contract-address> \
-  '{"total_locked":{
-    "token_addr":"paxi1token..."
-  }}' \
-  --chain-id paxi-testnet-1
+paxid query wasm contract-state smart paxi14hj2tav... \
+  '{
+    "total_locked": {
+      "token_addr": "paxi1token..."
+    }
+  }' \
+  --chain-id paxi-mainnet \
+  --output json | jq
 ```
 
-#### Query All Locks (by Owner)
+### VESTING CONTRACT
+
+#### Approve Token Dulu
 
 ```bash
-paxid query wasm contract-state smart <contract-address> \
-  '{"all_locks":{
-    "owner":"paxi1user..."
-  }}' \
-  --chain-id paxi-testnet-1
-```
-
-### Vesting Contract
-
-#### Create Vesting Schedule
-
-```bash
-paxid tx wasm execute <contract-address> \
-  '{"create_vesting":{
-    "beneficiary":"paxi1user...",
-    "total_amount":"10000000000",
-    "start_time":1704067200,
-    "cliff_duration":7776000,
-    "vesting_duration":31536000
-  }}' \
-  --from wallet-name \
-  --chain-id paxi-testnet-1 \
+paxid tx wasm execute paxi1token... \
+  '{
+    "increase_allowance": {
+      "spender": "paxi1vesting...",
+      "amount": "10000000000"
+    }
+  }' \
+  --from mywallet \
+  --chain-id paxi-mainnet \
   --gas auto \
   --fees 5000upaxi
 ```
 
-Parameter penjelasan:
-- `start_time`: Unix timestamp kapan vesting mulai
-- `cliff_duration`: Durasi cliff dalam detik (contoh: 7776000 = 90 hari)
-- `vesting_duration`: Total durasi vesting dalam detik (contoh: 31536000 = 1 tahun)
+#### Create Vesting
+
+```bash
+paxid tx wasm execute paxi1vesting... \
+  '{
+    "create_vesting": {
+      "beneficiary": "paxi1user...",
+      "total_amount": "10000000000",
+      "start_time": 1704067200,
+      "cliff_duration": 7776000,
+      "vesting_duration": 31536000
+    }
+  }' \
+  --from mywallet \
+  --chain-id paxi-mainnet \
+  --gas auto \
+  --fees 5000upaxi
+```
+
+Parameter:
+- `beneficiary`: Address penerima
+- `total_amount`: Total token
+- `start_time`: Unix timestamp mulai
+- `cliff_duration`: Durasi cliff (detik)
+- `vesting_duration`: Total durasi vesting (detik)
+
+Contoh durasi:
+- 90 hari cliff: `7776000`
+- 1 tahun vesting: `31536000`
 
 #### Claim Vested Tokens
 
 ```bash
-paxid tx wasm execute <contract-address> \
-  '{"claim":{}}' \
+paxid tx wasm execute paxi1vesting... \
+  '{"claim": {}}' \
   --from beneficiary-wallet \
-  --chain-id paxi-testnet-1 \
+  --chain-id paxi-mainnet \
   --gas auto \
-  --fees 5000upaxi
+  --fees 5000upaxi \
 ```
 
-#### Revoke Vesting (Owner Only)
+#### Revoke Vesting (Owner)
 
 ```bash
-paxid tx wasm execute <contract-address> \
-  '{"revoke_vesting":{
-    "beneficiary":"paxi1user..."
-  }}' \
-  --from owner-wallet \
-  --chain-id paxi-testnet-1 \
+paxid tx wasm execute paxi1vesting... \
+  '{
+    "revoke_vesting": {
+      "beneficiary": "paxi1user..."
+    }
+  }' \
+  --from mywallet \
+  --chain-id paxi-mainnet \
   --gas auto \
   --fees 5000upaxi
 ```
-
-Unvested tokens akan dikembalikan ke owner.
 
 #### Query Vesting Info
 
 ```bash
-paxid query wasm contract-state smart <contract-address> \
-  '{"vesting_info":{
-    "beneficiary":"paxi1user..."
-  }}' \
-  --chain-id paxi-testnet-1
+paxid query wasm contract-state smart paxi1vesting... \
+  '{
+    "vesting_info": {
+      "beneficiary": "paxi1user..."
+    }
+  }' \
+  --chain-id paxi-mainnet \
+  --output json | jq
 ```
 
 #### Query Claimable Amount
 
 ```bash
-paxid query wasm contract-state smart <contract-address> \
-  '{"claimable_amount":{
-    "beneficiary":"paxi1user..."
-  }}' \
-  --chain-id paxi-testnet-1
+paxid query wasm contract-state smart paxi1vesting... \
+  '{
+    "claimable_amount": {
+      "beneficiary": "paxi1user..."
+    }
+  }' \
+  --chain-id paxi-mainnet \
+  --output json | jq
 ```
 
-#### Query All Vesting Schedules
+#### Query All Vesting
 
 ```bash
-paxid query wasm contract-state smart <contract-address> \
-  '{"all_vesting":{}}' \
-  --chain-id paxi-testnet-1
+paxid query wasm contract-state smart paxi1vesting... \
+  '{"all_vesting": {}}' \
+  --chain-id paxi-mainnet \
+  --output json | jq
 ```
 
-#### Query Contract Config
+#### Query Config
 
 ```bash
-paxid query wasm contract-state smart <contract-address> \
-  '{"config":{}}' \
-  --chain-id paxi-testnet-1
+paxid query wasm contract-state smart paxi1vesting... \
+  '{"config": {}}' \
+  --chain-id paxi-mainnet \
+  --output json | jq
 ```
 
 ---
 
-## STRUKTUR PROJECT
+## TROUBLESHOOTING
 
-Setelah generate dan build, struktur folder jadi seperti ini:
+### Storage Permission Error
 
-```
-/
-├── prc20-lp-lock/
-│   ├── src/
-│   │   ├── contract.rs
-│   │   ├── msg.rs
-│   │   ├── state.rs
-│   │   ├── error.rs
-│   │   └── lib.rs
-│   ├── Cargo.toml
-│   └── target/ (build cache, bisa dihapus setelah build)
-│
-├── prc20-vesting/
-│   ├── src/
-│   │   ├── contract.rs
-│   │   ├── msg.rs
-│   │   ├── state.rs
-│   │   ├── error.rs
-│   │   └── lib.rs
-│   ├── Cargo.toml
-│   └── target/ (build cache, bisa dihapus setelah build)
-│
-├── artifacts/
-│   ├── prc20_lp_lock_optimized.wasm
-│   └── prc20_vesting_optimized.wasm
-│
-├── generate_lp_lock.sh
-├── build_lp_lock.sh
-├── generate_vesting.sh
-└── build_vesting.sh
+```bash
+termux-setup-storage
 ```
 
-File yang penting:
-- `artifacts/*.wasm`: hasil compile, ini yang di-deploy
-- `src/*.rs`: source code contracts
+Tekan "Allow" dan tunggu beberapa detik.
 
-File yang bisa dihapus untuk hemat storage:
-- `*/target/`: build cache
-- `~/.cargo/registry/`: dependencies cache
+### File Not Found
+
+```bash
+# Cek file di Download
+ls /storage/emulated/0/Download/
+
+# Copy manual jika perlu
+cp /storage/emulated/0/Download/paxi-contracts-release.zip ~/paxi-deploy/
+```
+
+### Insufficient Fees
+
+```bash
+# Tambah fees
+--fees 20000upaxi
+
+# Atau auto
+--gas auto --gas-adjustment 1.3
+```
+
+### Out of Gas
+
+```bash
+# Naikkan gas limit
+--gas 4000000
+```
+
+### Account Sequence Mismatch
+
+Tunggu transaksi sebelumnya selesai, atau:
+
+```bash
+paxid query auth account $(paxid keys show mywallet -a) \
+  --node https://mainnet-rpc.paxinet.io:443
+```
+
+### Unauthorized Error
+
+Pastikan menggunakan wallet yang benar:
+- Lock/Unlock: owner yang lock
+- Create vesting: owner contract
+- Claim: beneficiary
+- Revoke: owner contract
+
+### Token Transfer Failed
+
+Approve dulu sebelum lock/vest:
+
+```bash
+paxid tx wasm execute paxi1token... \
+  '{
+    "increase_allowance": {
+      "spender": "paxi1contract...",
+      "amount": "1000000000"
+    }
+  }' \
+  --from mywallet \
+  --chain-id paxi-mainnet \
+  --gas auto \
+  --fees 5000upaxi
+```
+
+### Unlock Failed: Still Locked
+
+Cek kondisi unlock:
+
+```bash
+# Cek lock info
+paxid query wasm contract-state smart paxi1lplock... \
+  '{"lock_info":{"owner":"paxi1...","lock_id":1}}' \
+  --chain-id paxi-mainnet \
+  --output json | jq
+
+# Current time
+date +%s
+
+# Current block
+paxid status --node https://mainnet-rpc.paxinet.io:443 | jq -r .sync_info.latest_block_height
+```
+
+### Claim Failed: Cliff Not Ended
+
+```bash
+# Cek vesting info
+paxid query wasm contract-state smart paxi1vesting... \
+  '{"vesting_info":{"beneficiary":"paxi1..."}}' \
+  --chain-id paxi-mainnet \
+  --output json | jq
+
+# Compare cliff_time dengan current time
+date +%s
+```
+
+### JSON Format Error
+
+Gunakan **snake_case**, bukan camelCase:
+
+✅ Benar:
+```json
+{"lock_by_time": {"token_addr": "...", "amount": "...", "unlock_time": ...}}
+```
+
+❌ Salah:
+```json
+{"lockByTime": {"tokenAddr": "...", "amount": "...", "unlockTime": ...}}
+```
 
 ---
 
-## SECURITY FEATURES
+## ESTIMASI BIAYA
 
-### LP Lock Contract
+### Deploy
+- Upload contract: 0.015 PAXI
+- Instantiate: 0.01 PAXI
+- **Total per contract: 0.025 PAXI**
 
-✅ **Overflow Protection** - Semua operasi arithmetic pakai checked methods  
-✅ **Reentrancy Protection** - State update sebelum external call  
-✅ **Access Control** - Hanya owner yang bisa unlock token mereka  
-✅ **Input Validation** - Validasi amount, time, dan height  
-✅ **Double Unlock Prevention** - Flag `is_unlocked` mencegah unlock berkali-kali  
-✅ **Safe Math** - Semua addition/subtraction pakai `checked_add/checked_sub`
+### Operasional
+- Lock/Unlock: 0.005 PAXI
+- Create vesting: 0.005 PAXI
+- Claim: 0.005 PAXI
+- Revoke: 0.005 PAXI
+- Query: 0 PAXI (gratis)
 
-### Vesting Contract
+### Total Setup 2 Contracts
+- Deploy 2 contracts: 0.05 PAXI
+- 10 test tx: 0.05 PAXI
+- **Total: 0.1 PAXI**
 
-✅ **Overflow Protection** - Time calculations pakai checked arithmetic  
-✅ **Reentrancy Protection** - Update claimed_amount sebelum transfer  
-✅ **Access Control** - Only owner bisa create/revoke vesting  
-✅ **Revoke Protection** - Owner bisa revoke dan ambil unvested tokens  
-✅ **Division by Zero** - Cek total_duration sebelum calculation  
-✅ **Duplicate Prevention** - Cek vesting sudah exists atau belum  
-✅ **Safe Math** - Semua operasi pakai safe methods
-
-### Rekomendasi Sebelum Mainnet
-
-- Test extensively di testnet
-- Code review dengan developer lain
-- Audit oleh security expert kalau handle dana besar
-- Start dengan amount kecil di mainnet
-- Monitor contract activity
+**Rekomendasi: Siapkan 0.15-0.2 PAXI**
 
 ---
 
-## TIPS & TRICKS
+## BUILD FROM SOURCE (OPTIONAL)
 
-### Build Lebih Cepat
+Jika ingin build sendiri dari source:
 
-```bash
-# Enable incremental compilation
-export CARGO_INCREMENTAL=1
-
-# Tapi pakai lebih banyak storage
-```
-
-### Hemat Memory
+### Install Dependencies
 
 ```bash
-# Limit parallel jobs
-export CARGO_BUILD_JOBS=1
-
-# Build satu-satu, jangan sekaligus
+pkg install rust binaryen -y
 ```
 
-### Monitor Progress Build
+### Clone Repository
 
 ```bash
-# Build dengan output verbose
-cd prc20-lp-lock
-RUST_LOG=debug cargo build --release --target wasm32-unknown-unknown
+git clone https://github.com/janji-pejabat/smart-contract
+cd smart-contract
 ```
 
-### Test Contract Locally (Tanpa Deploy)
+### Build LP Lock
 
 ```bash
-cd prc20-lp-lock
-cargo test
+./generate_lp_lock.sh
+./build_lp_lock.sh
 ```
 
-### Update Rust
+### Build Vesting
 
 ```bash
-rustup update stable
+./generate_vesting.sh
+./build_vesting.sh
 ```
 
-### Cek Size Contract
+File hasil ada di `artifacts/`:
+- `prc20_lp_lock_optimized.wasm`
+- `prc20_vesting_optimized.wasm`
 
-```bash
-ls -lh artifacts/
-du -h artifacts/*.wasm
+---
+
+## CONTRACT DETAILS
+
+### LP Lock
+
+**Execute Messages:**
+- `lock_by_time` - Lock sampai timestamp
+- `lock_by_height` - Lock sampai block height
+- `unlock` - Unlock token
+
+**Query Messages:**
+- `total_locked` - Total locked per token
+- `lock_info` - Detail lock
+- `all_locks` - Semua lock milik owner
+
+**Security:**
+- Overflow protection
+- Reentrancy protection
+- Access control
+- Double unlock prevention
+
+### Vesting
+
+**Execute Messages:**
+- `create_vesting` - Create schedule (owner)
+- `claim` - Claim vested tokens (beneficiary)
+- `revoke_vesting` - Revoke dan ambil unvested (owner)
+
+**Query Messages:**
+- `vesting_info` - Detail schedule
+- `claimable_amount` - Jumlah bisa claim
+- `all_vesting` - Semua schedules
+- `config` - Config contract
+
+**Vesting Calculation:**
+```
+vested = total * (current_time - start_time) / (end_time - start_time)
+claimable = vested - claimed
 ```
 
-Contract yang bagus biasanya di bawah 500KB setelah optimize.
-
-### Clean All Build Cache
-
-```bash
-# Clean semua target folders
-rm -rf prc20-*/target/
-
-# Clean cargo cache (akan re-download dependencies)
-cargo clean
-```
+**Security:**
+- Overflow protection
+- Reentrancy protection
+- Access control
+- Cliff protection
+- Revoke protection
 
 ---
 
 ## RESOURCES
 
-Dokumentasi:
-- Paxi Network: https://paxinet.io
-- Paxi Docs: https://docs.paxinet.io
-- CosmWasm Docs: https://docs.cosmwasm.com
+### Official
+- Website: https://paxinet.io
+- Docs: https://paxinet.io/paxi_docs
+- Explorer: https://explorer.paxinet.io
+- GitHub: https://github.com/paxi-web3/paxi
 
-Tools:
-- Explorer: https://ping.pub/paxi
-- Testnet Faucet: (tanya di Discord)
-
-Community:
+### Community
 - Discord: https://discord.gg/rA9Xzs69tx
 - Telegram: https://t.me/paxi_network
+- Twitter: https://twitter.com/paxi_network
+
+### Developer
+- Repository: https://github.com/janji-pejabat/smart-contract
+- CosmWasm: https://docs.cosmwasm.com
+- Cosmos SDK: https://docs.cosmos.network
+
+### Tools
+- Unix Timestamp: https://www.unixtimestamp.com
+- JSON Validator: https://jsonlint.com
+
+---
+
+## FAQ
+
+**Q: File WASM aman untuk deploy?**  
+A: Ya, file sudah di-build dengan optimization dan security best practices.
+
+**Q: Bisa unlock sebelum waktunya?**  
+A: Tidak. Contract enforce lock condition secara strict.
+
+**Q: Bisa cancel vesting?**  
+A: Owner bisa revoke. Vested tokens tetap bisa di-claim, unvested dikembalikan.
+
+**Q: Berapa gas yang dibutuhkan?**  
+A: ~200k gas untuk lock/unlock/create, ~150k untuk claim. Gunakan `--gas auto`.
+
+**Q: Bisa lock multiple tokens?**  
+A: Ya. Setiap lock punya ID unik.
+
+**Q: Bisa multiple vesting per beneficiary?**  
+A: Tidak. Satu beneficiary = satu schedule aktif.
 
 ---
 
 ## LICENSE
 
-MIT © 2025 paxi network community
+MIT © 2025 Paxi Network Community
+
+---
+
+## SUPPORT
+
+**Discord:** https://discord.gg/rA9Xzs69tx  
+**Telegram:** https://t.me/paxi_network  
+**GitHub Issues:** https://github.com/janji-pejabat/smart-contract/issues
+
+---
+
+**Happy building on Paxi! 🚀**

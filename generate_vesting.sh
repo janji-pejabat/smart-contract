@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# generate_vesting.sh - FULLY FIXED VERSION v2
-# Fixes: Pin base64ct to 1.6.0 to avoid edition2024 dependency
+# generate_vesting.sh - FIXED VERSION v3 (Audit)
+# Fixes: Pagination for Scalability
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -10,8 +10,8 @@ NC='\033[0m'
 
 clear
 echo -e "${BLUE}=========================================="
-echo "  VESTING CONTRACT GENERATOR (FIXED v2)"
-echo "  Edition 2021 + base64ct 1.6.0"
+echo "  VESTING CONTRACT GENERATOR (FIXED v3)"
+echo "  + Audit Fixes: Pagination & Safety"
 echo "==========================================${NC}"
 
 if ! command -v cargo &> /dev/null; then
@@ -22,11 +22,11 @@ fi
 mkdir -p contracts/prc20-vesting/src
 cd contracts/prc20-vesting
 
-# FIXED Cargo.toml - pin base64ct to 1.6.0 to avoid edition2024
+# FIXED Cargo.toml - pin base64ct to 1.6.0
 cat > Cargo.toml << 'EOF'
 [package]
 name = "prc20-vesting"
-version = "1.0.0"
+version = "1.0.1"
 edition = "2021"
 
 [lib]
@@ -96,7 +96,10 @@ pub enum QueryMsg {
     #[returns(ClaimableAmountResponse)]
     ClaimableAmount { beneficiary: String },
     #[returns(AllVestingResponse)]
-    AllVesting {},
+    AllVesting { 
+        start_after: Option<String>,
+        limit: Option<u32>,
+    },
     #[returns(ConfigResponse)]
     Config {},
 }
@@ -207,6 +210,7 @@ use cosmwasm_std::{
     entry_point, to_json_binary, Binary, Deps, DepsMut, Env, MessageInfo, 
     Response, StdResult, Uint128, WasmMsg, Order
 };
+use cw_storage_plus::Bound;
 use cw2::set_contract_version;
 use crate::error::ContractError;
 use crate::msg::{ExecuteMsg, InstantiateMsg, QueryMsg, VestingInfoResponse, 
@@ -454,16 +458,16 @@ fn calculate_vested_amount(vesting: &Vesting, current_time: u64) -> Uint128 {
 }
 
 #[entry_point]
-pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> StdResult<Binary> {
+pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
         QueryMsg::VestingInfo { beneficiary } => {
             to_json_binary(&query_vesting_info(deps, beneficiary)?)
         }
         QueryMsg::ClaimableAmount { beneficiary } => {
-            to_json_binary(&query_claimable_amount(deps, env, beneficiary)?)
+            to_json_binary(&query_claimable_amount(deps, _env, beneficiary)?)
         }
-        QueryMsg::AllVesting {} => {
-            to_json_binary(&query_all_vesting(deps)?)
+        QueryMsg::AllVesting { start_after, limit } => {
+            to_json_binary(&query_all_vesting(deps, start_after, limit)?)
         }
         QueryMsg::Config {} => {
             to_json_binary(&query_config(deps)?)
@@ -513,9 +517,16 @@ fn query_claimable_amount(
     Ok(ClaimableAmountResponse { claimable })
 }
 
-fn query_all_vesting(deps: Deps) -> StdResult<AllVestingResponse> {
+fn query_all_vesting(deps: Deps, start_after: Option<String>, limit: Option<u32>) -> StdResult<AllVestingResponse> {
+    let limit = limit.unwrap_or(10).min(30) as usize;
+    let start_bound = match start_after {
+        Some(s) => Some(Bound::exclusive(deps.api.addr_validate(&s)?)),
+        None => None,
+    };
+
     let schedules: Vec<VestingSchedule> = VESTING_SCHEDULES
-        .range(deps.storage, None, None, Order::Ascending)
+        .range(deps.storage, start_bound, None, Order::Ascending)
+        .take(limit)
         .map(|item| {
             let (_, vesting) = item?;
             Ok(VestingSchedule {
@@ -542,11 +553,9 @@ EOF
 cd ../..
 
 echo ""
-echo -e "${GREEN}✓ Vesting Contract Generated! (FIXED v2)${NC}"
-echo -e "${CYAN}Fixes Applied:${NC}"
-echo -e "  • Edition 2021 (stable)"
-echo -e "  • base64ct pinned to 1.6.0"
-echo -e "  • Proper overflow handling"
-echo -e "  • Fixed syntax error in revoke function"
+echo -e "${GREEN}✓ Vesting Contract Generated! (FIXED v3 Audit)${NC}"
+echo -e "${CYAN}Updates:${NC}"
+echo -e "  • Pagination added to AllVesting query"
+echo -e "  • Scalability improved"
 echo ""
 echo -e "${YELLOW}Next: ./build_vesting.sh${NC}"
