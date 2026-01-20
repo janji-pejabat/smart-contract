@@ -1,0 +1,1 @@
+https://mainnet-lcd.paxinet.io/cosmwasm/wasm/v1/code?pagination.limit=100

@@ -1,6 +1,9 @@
-Uplpad contract LP thx: EF8C3433F4B026473A87F63562A01C0A56310EE97CEAAB75B5AC163FDA3151A9
+Upload contract LP thx: 2BBB53074F07101968E9910EE335DEDEBA29B4544EFF272D99489528D3C72628
 
 Contract instantiated!:
-Contract: paxi1jd28dky85c9akyfpxk983ddwslwn0e4snkpsge27zx3tqlq7dcms8jskwki
-Tx Hash: 3036288B427D8ADE23DC1E9CB842FE9CE0EE8F2B8AE0BC477002E39055C40950
-Admin: paxi15ntap5eh9yv79re3l3eeyps99d53m4dxfnj6dzu
+
+Contract: paxi1nrwymv8r6hg2quv4h2uc76p02puy43cwdcu8aeuf5wqmgndl9jxqjpyd8e
+
+Admin: paxi15ntap5eh9yv79re3l3eeyps99d53m4dxfnj6dz
+
+Commit github: https://github.com/janji-pejabat/smart-contract/commit/edb5fe6f2ee92782eb7af89f601e66fd525b375f
